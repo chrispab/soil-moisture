@@ -166,7 +166,7 @@ unsigned int readSoilSensor() {
         // to flip ,flipped =  abs( (dry_max_raw - wet_min_raw) - inverted_reading_0_to_range ), gives o-dry to raw_range-wet
         //  to scale to 0-100, scaled = (raw_range/100) * flipped
         // #define DRY_SENSOR_MAX_RAW 3980.0f
-        #define DRY_SENSOR_MAX_RAW 3955.0f
+        #define DRY_SENSOR_MAX_RAW 3950.0f
 
         // #define WET_SENSOR_MIN_RAW 1490.0f
         #define WET_SENSOR_MIN_RAW 1500.0f
