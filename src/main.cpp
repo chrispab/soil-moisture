@@ -33,8 +33,6 @@
 LedFader heartBeatLED(GREEN_LED_PIN, 1, 0, 255, HEART_BEAT_TIME);
 LedFader blueBeatLED(ONBOARD_LED_PIN, 2, 0, 50, BLUE_BEAT_TIME);
 
-
-
 // MQTT stuff
 void callback(char *topic, byte *payload, unsigned int length) {
     // handle message arrived
@@ -57,7 +55,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
     // get last part of string - the command,
     // then irsend the code version of the command -m use a struct?
     //  https://stackoverflow.com/questions/5193570/value-lookup-table-in-c-by-strings
-    char commandStr[25];
+    // char commandStr[25];
 
     //         // irsend.sendNEC(POWER_ON);
     //! possible incoming topics and payload: "irbridge/amplifier/standby"     "on|off"
@@ -68,7 +66,6 @@ void callback(char *topic, byte *payload, unsigned int length) {
     //     Serial.println(actualval);
     //     // irsend.sendNEC(actualval);
     // }
-
 }
 
 IPAddress mqttBroker(192, 168, 0, MQTT_LAST_OCTET);
@@ -79,9 +76,11 @@ const uint32_t kBaudRate = 115200;
 
 void setup() {
     Serial.begin(115200);
-    delay(3000);
+    while (!Serial)  // Wait for the serial connection to be establised.
+        delay(50);
+    // delay(3000);
 
-    Serial.println("Hi from irbridge ... Booting");
+    Serial.println("Hi from soil1 ... Booting");
     connectWiFi();
     printWifiStatus();
     Serial.print("IP address: ");
@@ -92,18 +91,13 @@ void setup() {
     // connectMQTT();
     reconnectMQTT();
 
-    // irsend.begin();
     heartBeatLED.begin();  // initialize
     blueBeatLED.begin();   // initialize
     // you're connected now, so print out the status:
 
-    // Serial.begin(kBaudRate, SERIAL_8N1);
-    // while (!Serial)  // Wait for the serial connection to be establised.
-    //   delay(50);
-
     /* we use mDNS instead of IP of ESP32 directly */
     // hostname.local
-    ArduinoOTA.setHostname("irbridge");
+    ArduinoOTA.setHostname(HOST_NAME);
 
     ArduinoOTA
         .onStart([]() {
@@ -142,6 +136,58 @@ void setup() {
     Serial.println(WiFi.localIP());
 }
 
+unsigned int lastSoilSampleMs = 0;
+
+unsigned int readSoilSensor() {
+    unsigned int now = millis();
+    unsigned int sensorValue;
+    char sensorValueStr[17];            // max 16 chars string
+    char normalisedSensorValueStr[17];  // max 16 chars string
+
+    sensorValue = 0;
+    if (now - lastSoilSampleMs > SOIL_SAMPLE_INTERVAL) {
+        lastSoilSampleMs = now;
+
+        Serial.print("Sampling Sensor.....RAW..");
+
+        sensorValue = analogRead(SENSOR_PIN);
+        Serial.println(sensorValue);
+
+        utoa(sensorValue, sensorValueStr, 10);
+        MQTTclient.publish("soil1/moisture_raw", sensorValueStr);
+
+        // for a 0-100 output range
+// get range raw / 100 ggives steps per %
+// raw range = 3960 - 1530
+// steps per % = raw range/100
+
+// for 0 to top of range -> for 0 to raw_range - > inverted_reading_0_to_range = reading - wet_min_raw , where 0 is wet, and dry_max_raw is dry
+
+// to flip ,flipped =  abs( (dry_max_raw - wet_min_raw) - inverted_reading_0_to_range ), gives o-dry to raw_range-wet
+//  to scale to 0-100, scaled = (raw_range/100) * flipped
+// #define DRY_SENSOR_MAX_RAW 3980.0f
+#define DRY_SENSOR_MAX_RAW 3950.0f
+
+// #define WET_SENSOR_MIN_RAW 1490.0f
+#define WET_SENSOR_MIN_RAW 1500.0f
+
+#define RAW_RANGE (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW)
+        float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)sensorValue - WET_SENSOR_MIN_RAW)) / (RAW_RANGE / 100.0f);
+        // convert float to 1dp string
+        sprintf(normalisedSensorValueStr, "%.1f", normalisedSensorValue);  // make the number into string using sprintf function
+        // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");
+        // Serial.println((RAW_RANGE / 100.0f));
+
+        Serial.print("Sampling Sensor.....NOR..");
+        Serial.println(normalisedSensorValueStr);
+        MQTTclient.publish("soil1/moisture", normalisedSensorValueStr);
+
+        // lastSoilSampleMs = 0;
+    }
+    // return MQTTclient.connected();
+    return sensorValue;
+}
+
 void loop() {
     // connectWiFi();
     // maybe checkwifi here
@@ -154,6 +200,8 @@ void loop() {
         // Client is connected
         MQTTclient.loop();  // process any MQTT stuff, returned in callback
     }
+    // unsigned int soilSensorValue =
+    readSoilSensor();
 
     ArduinoOTA.handle();
 

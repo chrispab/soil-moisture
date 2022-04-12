@@ -1,6 +1,7 @@
 #include "WiFiLib.h"
 
 #include "../../src/secret.h"
+#include "../../src/config.h"
 
 // WiFi settings
 const char ssid[] = MY_SSID;
@@ -11,15 +12,15 @@ void connectWiFi() {
     // Serial.println("Hi from connectWifi");
 
     if (!WiFi.isConnected()) {
-        Serial.println("Wifi is not connected ...Trying to connect now");
-        WiFi.setHostname("irbridge");
+        Serial.println("Wifi is NOT connected ...Trying to connect now");
+        WiFi.setHostname(HOST_NAME);
         WiFi.begin(ssid, pass);  // move out or if
         while (WiFi.waitForConnectResult() != WL_CONNECTED) {
             Serial.println("Connection Failed! Rebooting...");
             delay(5000);
             ESP.restart();
         }
-        Serial.println("Wifi is now connected.....");
+        Serial.println("Wifi is NOW CONNECTED!");
         printWifiStatus();
     }
 }
