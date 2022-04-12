@@ -157,21 +157,21 @@ unsigned int readSoilSensor() {
         MQTTclient.publish("soil1/moisture_raw", sensorValueStr);
 
         // for a 0-100 output range
-// get range raw / 100 ggives steps per %
-// raw range = 3960 - 1530
-// steps per % = raw range/100
+        // get range raw / 100 ggives steps per %
+        // raw range = 3960 - 1530
+        // steps per % = raw range/100
 
-// for 0 to top of range -> for 0 to raw_range - > inverted_reading_0_to_range = reading - wet_min_raw , where 0 is wet, and dry_max_raw is dry
+        // for 0 to top of range -> for 0 to raw_range - > inverted_reading_0_to_range = reading - wet_min_raw , where 0 is wet, and dry_max_raw is dry
 
-// to flip ,flipped =  abs( (dry_max_raw - wet_min_raw) - inverted_reading_0_to_range ), gives o-dry to raw_range-wet
-//  to scale to 0-100, scaled = (raw_range/100) * flipped
-// #define DRY_SENSOR_MAX_RAW 3980.0f
-#define DRY_SENSOR_MAX_RAW 3950.0f
+        // to flip ,flipped =  abs( (dry_max_raw - wet_min_raw) - inverted_reading_0_to_range ), gives o-dry to raw_range-wet
+        //  to scale to 0-100, scaled = (raw_range/100) * flipped
+        // #define DRY_SENSOR_MAX_RAW 3980.0f
+        #define DRY_SENSOR_MAX_RAW 3955.0f
 
-// #define WET_SENSOR_MIN_RAW 1490.0f
-#define WET_SENSOR_MIN_RAW 1500.0f
+        // #define WET_SENSOR_MIN_RAW 1490.0f
+        #define WET_SENSOR_MIN_RAW 1500.0f
 
-#define RAW_RANGE (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW)
+        #define RAW_RANGE (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW)
         float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)sensorValue - WET_SENSOR_MIN_RAW)) / (RAW_RANGE / 100.0f);
         // convert float to 1dp string
         sprintf(normalisedSensorValueStr, "%.1f", normalisedSensorValue);  // make the number into string using sprintf function
@@ -181,10 +181,7 @@ unsigned int readSoilSensor() {
         Serial.print("Sampling Sensor.....NOR..");
         Serial.println(normalisedSensorValueStr);
         MQTTclient.publish("soil1/moisture", normalisedSensorValueStr);
-
-        // lastSoilSampleMs = 0;
     }
-    // return MQTTclient.connected();
     return sensorValue;
 }
 

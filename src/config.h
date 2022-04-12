@@ -8,8 +8,8 @@
 // #define ALT_ID
 
 #ifdef ALT_ID
-    #define MQTT_CLIENT_NAME "IRBridgeMQTTClientALT"
-    #define LWT_TOPIC "irbridgeALT/LWT"
+    #define MQTT_CLIENT_NAME "Soil1MQTTClientALT"
+    #define LWT_TOPIC "Soil1ALT/LWT"
 #else
     #define MQTT_CLIENT_NAME "Soil1MQTTClient"
     #define LWT_TOPIC "soil1/LWT"
@@ -32,7 +32,7 @@
 
 #define MQTT_LAST_OCTET 100
 
-#define HOST_NAME "soil1"
+#define HOST_NAME "soil1.local"
 #define SOIL_SAMPLE_INTERVAL 5000 //MS DELAY BETWEEN SAMPLES
 
 #define SENSOR_PIN GPIO_NUM_36
