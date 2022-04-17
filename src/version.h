@@ -1,2 +1,2 @@
-#define VERSION "V1.0, main:soil-moisture"
+#define VERSION "V1.1, main:soil-moisture sub range"
 

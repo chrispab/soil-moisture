@@ -136,7 +136,7 @@ void setup() {
     Serial.println(WiFi.localIP());
 }
 
-unsigned int lastSoilSampleMs = 0;
+unsigned int lastSoilSampleMs = millis() - SOIL_SAMPLE_INTERVAL;
 
 unsigned int readSoilSensor() {
     unsigned int now = millis();
@@ -177,10 +177,33 @@ unsigned int readSoilSensor() {
         sprintf(normalisedSensorValueStr, "%.1f", normalisedSensorValue);  // make the number into string using sprintf function
         // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");
         // Serial.println((RAW_RANGE / 100.0f));
-
         Serial.print("Sampling Sensor.....NOR..");
         Serial.println(normalisedSensorValueStr);
         MQTTclient.publish("soil1/moisture", normalisedSensorValueStr);
+
+
+
+
+        //partial normalising
+        #define dryMAX_RAW 3500.0f 
+
+        // #define WET_SENSOR_MIN_RAW 1490.0f
+        #define wetMIN_RAW 2772.8f//2772.8 is eq to 74.4% normalised 
+
+        #define RAW_R (dryMAX_RAW - wetMIN_RAW)
+        float normalisedRangeSensorValue = (float)abs(RAW_R - ((float)sensorValue - wetMIN_RAW)) / (RAW_R / 100.0f);
+        // convert float to 1dp string
+        sprintf(normalisedSensorValueStr, "%.1f", normalisedRangeSensorValue);  // make the number into string using sprintf function
+        // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");
+        // Serial.println((RAW_RANGE / 100.0f));
+        Serial.print("Sampling Sensor.....NOR limit sub range ..");
+        Serial.println(normalisedSensorValueStr);
+        MQTTclient.publish("soil1/moisture_2", normalisedSensorValueStr);
+
+
+
+
+
     }
     return sensorValue;
 }
