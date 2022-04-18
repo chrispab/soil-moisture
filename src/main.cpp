@@ -136,13 +136,31 @@ void setup() {
     Serial.println(WiFi.localIP());
 }
 
+
+
+
+
+
+unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max){
+    if(reading > max){
+        return max;
+    }
+    if(reading < min){
+        return min;
+    }
+    return reading;
+
+}
+
 unsigned int lastSoilSampleMs = millis() - SOIL_SAMPLE_INTERVAL;
+
 
 unsigned int readSoilSensor() {
     unsigned int now = millis();
     unsigned int sensorValue;
     char sensorValueStr[17];            // max 16 chars string
     char normalisedSensorValueStr[17];  // max 16 chars string
+    char normalisedRangeSensorValueStr[17];  // max 16 chars string
 
     sensorValue = 0;
     if (now - lastSoilSampleMs > SOIL_SAMPLE_INTERVAL) {
@@ -167,38 +185,32 @@ unsigned int readSoilSensor() {
         //  to scale to 0-100, scaled = (raw_range/100) * flipped
         // #define DRY_SENSOR_MAX_RAW 3980.0f
         #define DRY_SENSOR_MAX_RAW 3950.0f
-
-        // #define WET_SENSOR_MIN_RAW 1490.0f
         #define WET_SENSOR_MIN_RAW 1500.0f
+        #define RAW_RANGE (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW) // 2450
 
-        #define RAW_RANGE (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW)
-        float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)sensorValue - WET_SENSOR_MIN_RAW)) / (RAW_RANGE / 100.0f);
+        unsigned int limitedSensorValue = limitSensorValue(sensorValue, WET_SENSOR_MIN_RAW, DRY_SENSOR_MAX_RAW );
+        float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)limitedSensorValue - WET_SENSOR_MIN_RAW)) / (RAW_RANGE / 100.0f);
         // convert float to 1dp string
         sprintf(normalisedSensorValueStr, "%.1f", normalisedSensorValue);  // make the number into string using sprintf function
-        // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");
-        // Serial.println((RAW_RANGE / 100.0f));
+        // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");      // Serial.println((RAW_RANGE / 100.0f));
         Serial.print("Sampling Sensor.....NOR..");
         Serial.println(normalisedSensorValueStr);
         MQTTclient.publish("soil1/moisture", normalisedSensorValueStr);
 
 
-
-
         //partial normalising
-        #define dryMAX_RAW 3500.0f 
+        #define dryMAX_RAW 3300.0f //2772.8 is eq to 74.4% normalised
+        #define wetMIN_RAW 2200.0f//1685 is eq to  normalised - 30%
+        #define RAW_R (dryMAX_RAW - wetMIN_RAW)  // 1088 
 
-        // #define WET_SENSOR_MIN_RAW 1490.0f
-        #define wetMIN_RAW 2772.8f//2772.8 is eq to 74.4% normalised 
-
-        #define RAW_R (dryMAX_RAW - wetMIN_RAW)
-        float normalisedRangeSensorValue = (float)abs(RAW_R - ((float)sensorValue - wetMIN_RAW)) / (RAW_R / 100.0f);
+        limitedSensorValue = limitSensorValue(sensorValue, wetMIN_RAW, dryMAX_RAW );
+        float normalisedRangeSensorValue = (float)abs((RAW_R - ((float)limitedSensorValue - wetMIN_RAW)) / (RAW_R / 100.0f));
         // convert float to 1dp string
-        sprintf(normalisedSensorValueStr, "%.1f", normalisedRangeSensorValue);  // make the number into string using sprintf function
-        // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");
-        // Serial.println((RAW_RANGE / 100.0f));
+        sprintf(normalisedRangeSensorValueStr, "%.1f", normalisedRangeSensorValue);  // make the number into string using sprintf function
+        // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");      // Serial.println((RAW_RANGE / 100.0f));
         Serial.print("Sampling Sensor.....NOR limit sub range ..");
-        Serial.println(normalisedSensorValueStr);
-        MQTTclient.publish("soil1/moisture_2", normalisedSensorValueStr);
+        Serial.println(normalisedRangeSensorValueStr);
+        MQTTclient.publish("soil1/moisture_2", normalisedRangeSensorValueStr);
 
 
 
