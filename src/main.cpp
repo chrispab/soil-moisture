@@ -153,7 +153,7 @@ unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned i
 }
 
 unsigned int lastSoilSampleMs = millis() - SOIL_SAMPLE_INTERVAL;
-
+float prevFilteredValue = 0.0;
 
 unsigned int readSoilSensor() {
     unsigned int now = millis();
@@ -161,6 +161,7 @@ unsigned int readSoilSensor() {
     char sensorValueStr[17];            // max 16 chars string
     char normalisedSensorValueStr[17];  // max 16 chars string
     char normalisedRangeSensorValueStr[17];  // max 16 chars string
+    char newFilterdValueStr[17];  // max 16 chars string newFilterdValue
 
     sensorValue = 0;
     if (now - lastSoilSampleMs > SOIL_SAMPLE_INTERVAL) {
@@ -184,11 +185,14 @@ unsigned int readSoilSensor() {
         // to flip ,flipped =  abs( (dry_max_raw - wet_min_raw) - inverted_reading_0_to_range ), gives o-dry to raw_range-wet
         //  to scale to 0-100, scaled = (raw_range/100) * flipped
         // #define DRY_SENSOR_MAX_RAW 3980.0f
+
+
+
         #define DRY_SENSOR_MAX_RAW 3950.0f
         #define WET_SENSOR_MIN_RAW 1500.0f
         #define RAW_RANGE (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW) // 2450
-
         unsigned int limitedSensorValue = limitSensorValue(sensorValue, WET_SENSOR_MIN_RAW, DRY_SENSOR_MAX_RAW );
+
         float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)limitedSensorValue - WET_SENSOR_MIN_RAW)) / (RAW_RANGE / 100.0f);
         // convert float to 1dp string
         sprintf(normalisedSensorValueStr, "%.1f", normalisedSensorValue);  // make the number into string using sprintf function
@@ -199,8 +203,9 @@ unsigned int readSoilSensor() {
 
 
         //partial normalising
-        #define dryMAX_RAW 3300.0f //2772.8 is eq to 74.4% normalised
-        #define wetMIN_RAW 2200.0f//1685 is eq to  normalised - 30%
+        #define dryMAX_RAW 3290.0f //2772.8 is eq to 74.4% normalised
+        #define wetMIN_RAW 1710.0f//1685 is eq to  normalised - 30%
+        //1725, 1712
         #define RAW_R (dryMAX_RAW - wetMIN_RAW)  // 1088 
 
         limitedSensorValue = limitSensorValue(sensorValue, wetMIN_RAW, dryMAX_RAW );
@@ -208,13 +213,21 @@ unsigned int readSoilSensor() {
         // convert float to 1dp string
         sprintf(normalisedRangeSensorValueStr, "%.1f", normalisedRangeSensorValue);  // make the number into string using sprintf function
         // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");      // Serial.println((RAW_RANGE / 100.0f));
-        Serial.print("Sampling Sensor.....NOR limit sub range ..");
+        Serial.print("Sampling Sensor.....NOR limit sub range .._2");
         Serial.println(normalisedRangeSensorValueStr);
         MQTTclient.publish("soil1/moisture_2", normalisedRangeSensorValueStr);
 
-
-
-
+        //now try a filtered ver of normalisedRangeSensorValue
+        //newFilterdValue = (prevFilteredValue/2) + (normalisedRangeSensorValue/2)
+        if (prevFilteredValue==0){
+            prevFilteredValue=normalisedRangeSensorValue;
+        }
+        float newFilterdValue = (prevFilteredValue/2) + (normalisedRangeSensorValue/2);
+        prevFilteredValue = newFilterdValue;
+        sprintf(newFilterdValueStr, "%.1f", newFilterdValue);  // make the number into string using sprintf function
+        Serial.print("Sampling Sensor.....filtered limit sub range _3..");
+        Serial.println(newFilterdValueStr);
+        MQTTclient.publish("soil1/moisture_3", newFilterdValueStr);
 
     }
     return sensorValue;
