@@ -17,6 +17,7 @@
 #include "MQTTLib.h"
 #include "WiFiLib.h"
 #include "config.h"
+#include "version.h"
 // #include "ircodes.h"
 
 #define GREEN_LED_PIN GPIO_NUM_12   //
@@ -156,7 +157,7 @@ unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned i
 #define MQTT_TRANSMIT_INTERVAL (15 * 60 * 1000) //MS DELAY BETWEEN SAMPLES
 size_t lastMQTTTransmitMs = millis() - MQTT_TRANSMIT_INTERVAL;
 float prevFilteredValue = 0.0;
-#define RUNNING_SAMPLE_INTERVAL ( 5 * 1000 )
+#define RUNNING_SAMPLE_INTERVAL ( 10 * 1000 )
 size_t lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL;
 size_t runningSensorReading = analogRead(SENSOR_PIN); //running total reading - taken every RUNNING_SAMPLE_INTERVAL
 
@@ -172,11 +173,14 @@ unsigned int readSoilSensor() {
     sensorValue = 0;
     if(now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL){
         // runningSensorReading = (runningSensorReading + analogRead(SENSOR_PIN))/2;
-        runningSensorReading = ( ((runningSensorReading*75)/100) + ((analogRead(SENSOR_PIN)*25)/100) );
+        runningSensorReading = ( ((runningSensorReading*80)/100) + ((analogRead(SENSOR_PIN)*20)/100) );
         lastMoistureSampleMs = now;
     }
     if (now - lastMQTTTransmitMs > MQTT_TRANSMIT_INTERVAL) {
         lastMQTTTransmitMs = now;
+
+        //publish telemetry
+        MQTTclient.publish("soil1/version", VERSION);
 
         Serial.print("Sampling Sensor.....RAW..");
 
