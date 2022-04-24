@@ -152,27 +152,53 @@ unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned i
 
 }
 
-unsigned int lastSoilSampleMs = millis() - SOIL_SAMPLE_INTERVAL;
+
+#define MQTT_TRANSMIT_INTERVAL (15 * 60 * 1000) //MS DELAY BETWEEN SAMPLES
+size_t lastMQTTTransmitMs = millis() - MQTT_TRANSMIT_INTERVAL;
 float prevFilteredValue = 0.0;
+#define RUNNING_SAMPLE_INTERVAL ( 5 * 1000 )
+size_t lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL;
+size_t runningSensorReading = analogRead(SENSOR_PIN); //running total reading - taken every RUNNING_SAMPLE_INTERVAL
 
 unsigned int readSoilSensor() {
-    unsigned int now = millis();
-    unsigned int sensorValue;
+
+    size_t now = millis();
+    size_t sensorValue;
     char sensorValueStr[17];            // max 16 chars string
     char normalisedSensorValueStr[17];  // max 16 chars string
     char normalisedRangeSensorValueStr[17];  // max 16 chars string
     char newFilterdValueStr[17];  // max 16 chars string newFilterdValue
 
     sensorValue = 0;
-    if (now - lastSoilSampleMs > SOIL_SAMPLE_INTERVAL) {
-        lastSoilSampleMs = now;
+    if(now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL){
+        // runningSensorReading = (runningSensorReading + analogRead(SENSOR_PIN))/2;
+        runningSensorReading = ( ((runningSensorReading*75)/100) + ((analogRead(SENSOR_PIN)*25)/100) );
+        lastMoistureSampleMs = now;
+    }
+    if (now - lastMQTTTransmitMs > MQTT_TRANSMIT_INTERVAL) {
+        lastMQTTTransmitMs = now;
 
         Serial.print("Sampling Sensor.....RAW..");
 
+        //try ave of several readings?
+        size_t count = 20;
+        size_t total = 0;
         sensorValue = analogRead(SENSOR_PIN);
-        Serial.println(sensorValue);
+        size_t moisture_raw = sensorValue;
+        for (size_t i = 0; i < count; i++)
+        {
+            delay(500);
+            total = total + sensorValue;
+            sensorValue = analogRead(SENSOR_PIN);
+        }
+        size_t moisture_4 = total/count;
 
-        utoa(sensorValue, sensorValueStr, 10);
+        //sensorValue = analogRead(SENSOR_PIN);
+
+
+        Serial.println(moisture_raw);
+
+        utoa(moisture_raw, sensorValueStr, 10);
         MQTTclient.publish("soil1/moisture_raw", sensorValueStr);
 
         // for a 0-100 output range
@@ -191,7 +217,7 @@ unsigned int readSoilSensor() {
         #define DRY_SENSOR_MAX_RAW 3950.0f
         #define WET_SENSOR_MIN_RAW 1500.0f
         #define RAW_RANGE (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW) // 2450
-        unsigned int limitedSensorValue = limitSensorValue(sensorValue, WET_SENSOR_MIN_RAW, DRY_SENSOR_MAX_RAW );
+        unsigned int limitedSensorValue = limitSensorValue(moisture_raw, WET_SENSOR_MIN_RAW, DRY_SENSOR_MAX_RAW );
 
         float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)limitedSensorValue - WET_SENSOR_MIN_RAW)) / (RAW_RANGE / 100.0f);
         // convert float to 1dp string
@@ -208,7 +234,7 @@ unsigned int readSoilSensor() {
         //1725, 1712
         #define RAW_R (dryMAX_RAW - wetMIN_RAW)  // 1088 
 
-        limitedSensorValue = limitSensorValue(sensorValue, wetMIN_RAW, dryMAX_RAW );
+        limitedSensorValue = limitSensorValue(moisture_raw, wetMIN_RAW, dryMAX_RAW );
         float normalisedRangeSensorValue = (float)abs((RAW_R - ((float)limitedSensorValue - wetMIN_RAW)) / (RAW_R / 100.0f));
         // convert float to 1dp string
         sprintf(normalisedRangeSensorValueStr, "%.1f", normalisedRangeSensorValue);  // make the number into string using sprintf function
@@ -228,6 +254,35 @@ unsigned int readSoilSensor() {
         Serial.print("Sampling Sensor.....filtered limit sub range _3..");
         Serial.println(newFilterdValueStr);
         MQTTclient.publish("soil1/moisture_3", newFilterdValueStr);
+
+
+
+
+        //averaged count
+        //moisture_4
+        limitedSensorValue = limitSensorValue(moisture_4, wetMIN_RAW, dryMAX_RAW );
+        float normalisedRangeSensorValue4 = (float)abs((RAW_R - ((float)limitedSensorValue - wetMIN_RAW)) / (RAW_R / 100.0f));
+        // convert float to 1dp string
+        sprintf(normalisedRangeSensorValueStr, "%.1f", normalisedRangeSensorValue4);  // make the number into string using sprintf function
+        // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");      // Serial.println((RAW_RANGE / 100.0f));
+        Serial.print("Sampling Sensor.....NOR limit sub range ..moisture_4");
+        Serial.println(normalisedRangeSensorValueStr);
+        MQTTclient.publish("soil1/moisture_4", normalisedRangeSensorValueStr);
+
+        //averaged count
+        //moisture_5
+        limitedSensorValue = limitSensorValue(runningSensorReading, wetMIN_RAW, dryMAX_RAW );
+        float normalisedRangeSensorValue5 = (float)abs((RAW_R - ((float)limitedSensorValue - wetMIN_RAW)) / (RAW_R / 100.0f));
+        // convert float to 1dp string
+        sprintf(normalisedRangeSensorValueStr, "%.1f", normalisedRangeSensorValue5);  // make the number into string using sprintf function
+        // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");      // Serial.println((RAW_RANGE / 100.0f));
+        Serial.print("Sampling Sensor.....NOR limit sub range ..moisture_5");
+        Serial.println(normalisedRangeSensorValueStr);
+        MQTTclient.publish("soil1/moisture_5", normalisedRangeSensorValueStr);
+
+
+
+
 
     }
     return sensorValue;

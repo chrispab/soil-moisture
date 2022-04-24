@@ -33,7 +33,6 @@
 #define MQTT_LAST_OCTET 100
 
 #define HOST_NAME "soil1.local"
-#define SOIL_SAMPLE_INTERVAL (10 * 60 * 1000) //MS DELAY BETWEEN SAMPLES
 
 #define SENSOR_PIN GPIO_NUM_36
 
