@@ -157,11 +157,11 @@ unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned i
 #define MQTT_TRANSMIT_INTERVAL (15 * 60 * 1000) //MS DELAY BETWEEN SAMPLES
 size_t lastMQTTTransmitMs = millis() - MQTT_TRANSMIT_INTERVAL;
 float prevFilteredValue = 0.0;
-#define RUNNING_SAMPLE_INTERVAL ( 10 * 1000 )
+#define RUNNING_SAMPLE_INTERVAL ( 20 * 1000 )
 size_t lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL;
 size_t runningSensorReading = analogRead(SENSOR_PIN); //running total reading - taken every RUNNING_SAMPLE_INTERVAL
 
-unsigned int readSoilSensor() {
+unsigned int readMoistureSensor() {
 
     size_t now = millis();
     size_t sensorValue;
@@ -233,8 +233,8 @@ unsigned int readSoilSensor() {
 
 
         //partial normalising
-        #define dryMAX_RAW 3290.0f //2772.8 is eq to 74.4% normalised
-        #define wetMIN_RAW 1710.0f//1685 is eq to  normalised - 30%
+        #define dryMAX_RAW 3290.0f //
+        #define wetMIN_RAW 1710.0f//
         //1725, 1712
         #define RAW_R (dryMAX_RAW - wetMIN_RAW)  // 1088 
 
@@ -275,18 +275,14 @@ unsigned int readSoilSensor() {
 
         //averaged count
         //moisture_5
-        limitedSensorValue = limitSensorValue(runningSensorReading, wetMIN_RAW, dryMAX_RAW );
-        float normalisedRangeSensorValue5 = (float)abs((RAW_R - ((float)limitedSensorValue - wetMIN_RAW)) / (RAW_R / 100.0f));
+        unsigned int limitedSensorValue5 = limitSensorValue(runningSensorReading, wetMIN_RAW, dryMAX_RAW );
+        float normalisedRangeSensorValue5 = (float)abs((RAW_R - ((float)limitedSensorValue5 - wetMIN_RAW)) / (RAW_R / 100.0f));
         // convert float to 1dp string
         sprintf(normalisedRangeSensorValueStr, "%.1f", normalisedRangeSensorValue5);  // make the number into string using sprintf function
         // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");      // Serial.println((RAW_RANGE / 100.0f));
         Serial.print("Sampling Sensor.....NOR limit sub range ..moisture_5");
         Serial.println(normalisedRangeSensorValueStr);
         MQTTclient.publish("soil1/moisture_5", normalisedRangeSensorValueStr);
-
-
-
-
 
     }
     return sensorValue;
@@ -305,7 +301,7 @@ void loop() {
         MQTTclient.loop();  // process any MQTT stuff, returned in callback
     }
     // unsigned int soilSensorValue =
-    readSoilSensor();
+    readMoistureSensor();
 
     ArduinoOTA.handle();
 
