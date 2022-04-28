@@ -169,6 +169,7 @@ unsigned int readMoistureSensor() {
     char normalisedSensorValueStr[17];  // max 16 chars string
     char normalisedRangeSensorValueStr[17];  // max 16 chars string
     char newFilterdValueStr[17];  // max 16 chars string newFilterdValue
+    char normalisedRangeSensorValue_6Str[17];  // max 16 chars string
 
     sensorValue = 0;
     if(now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL){
@@ -233,7 +234,7 @@ unsigned int readMoistureSensor() {
 
 
         //partial normalising
-        #define dryMAX_RAW 3290.0f //
+        #define dryMAX_RAW 3290.0f //try 2970,3000
         #define wetMIN_RAW 1710.0f//
         //1725, 1712
         #define RAW_R (dryMAX_RAW - wetMIN_RAW)  // 1088 
@@ -262,6 +263,8 @@ unsigned int readMoistureSensor() {
 
 
 
+
+
         //averaged count
         //moisture_4
         limitedSensorValue = limitSensorValue(moisture_4, wetMIN_RAW, dryMAX_RAW );
@@ -283,6 +286,19 @@ unsigned int readMoistureSensor() {
         Serial.print("Sampling Sensor.....NOR limit sub range ..moisture_5");
         Serial.println(normalisedRangeSensorValueStr);
         MQTTclient.publish("soil1/moisture_5", normalisedRangeSensorValueStr);
+
+
+        //new normalising
+        #define RAW_0PC_DRY 3000.0f //try 2970,2976,3000
+        #define RAW_100PC_WET 1710.0f//1725, 1712
+        #define RAW_RANGE_6 (RAW_0PC_DRY - RAW_100PC_WET) 
+
+        limitedSensorValue = limitSensorValue(moisture_raw, RAW_100PC_WET, RAW_0PC_DRY );
+        float normalisedRangeSensorValue_6 = (float)abs((RAW_RANGE_6 - ((float)limitedSensorValue - RAW_100PC_WET)) / (RAW_RANGE_6 / 100.0f));
+        sprintf(normalisedRangeSensorValue_6Str, "%.1f", normalisedRangeSensorValue_6);// convert float to 1dp string
+        Serial.print("Sampling Sensor.....NOR limit sub range .._2");
+        Serial.println(normalisedRangeSensorValue_6Str);
+        MQTTclient.publish("soil1/moisture_6", normalisedRangeSensorValue_6Str);
 
     }
     return sensorValue;

@@ -1,2 +1,2 @@
-#define VERSION "V1.4, main:continous ave 5, 20 secs"
+#define VERSION "V1.5, main:new range - 6"
 
