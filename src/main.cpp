@@ -288,15 +288,15 @@ unsigned int readMoistureSensor() {
         MQTTclient.publish("soil1/moisture_5", normalisedRangeSensorValueStr);
 
 
-        //new normalising
-        #define RAW_0PC_DRY 3000.0f //try 2970,2976,3000
-        #define RAW_100PC_WET 1710.0f//1725, 1712
+        //new normalising 6
+        #define RAW_0PC_DRY 3100.0f //try 2970,2976,3000,3055 3100 3200
+        #define RAW_100PC_WET 1630.0f//1725, 1712,1631
         #define RAW_RANGE_6 (RAW_0PC_DRY - RAW_100PC_WET) 
 
         limitedSensorValue = limitSensorValue(moisture_raw, RAW_100PC_WET, RAW_0PC_DRY );
         float normalisedRangeSensorValue_6 = (float)abs((RAW_RANGE_6 - ((float)limitedSensorValue - RAW_100PC_WET)) / (RAW_RANGE_6 / 100.0f));
         sprintf(normalisedRangeSensorValue_6Str, "%.1f", normalisedRangeSensorValue_6);// convert float to 1dp string
-        Serial.print("Sampling Sensor.....NOR limit sub range .._2");
+        Serial.print("Sampling Sensor.....NOR limit sub range .._6");
         Serial.println(normalisedRangeSensorValue_6Str);
         MQTTclient.publish("soil1/moisture_6", normalisedRangeSensorValue_6Str);
 
@@ -305,18 +305,13 @@ unsigned int readMoistureSensor() {
 }
 
 void loop() {
-    // connectWiFi();
-    // maybe checkwifi here
     connectWiFi();
 
     if (!MQTTclient.connected()) {
-        // Attempt to reconnect
         reconnectMQTT();  // Attempt to reconnect
-    } else {
-        // Client is connected
+    } else {// Client is connected
         MQTTclient.loop();  // process any MQTT stuff, returned in callback
     }
-    // unsigned int soilSensorValue =
     readMoistureSensor();
 
     ArduinoOTA.handle();
