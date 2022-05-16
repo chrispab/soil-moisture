@@ -289,8 +289,8 @@ unsigned int readMoistureSensor() {
 
 
         //new normalising 6
-        #define RAW_0PC_DRY 3100.0f //try 2970,2976,3000,3055 3100 3200
-        #define RAW_100PC_WET 1630.0f//1725, 1712,1631
+        #define RAW_0PC_DRY 2980.0f //try 2970,2976,3000,3055 3100 3200,3100,2980
+        #define RAW_100PC_WET 1570.0f//1725, 1712,1631,1630,1570
         #define RAW_RANGE_6 (RAW_0PC_DRY - RAW_100PC_WET) 
 
         limitedSensorValue = limitSensorValue(moisture_raw, RAW_100PC_WET, RAW_0PC_DRY );

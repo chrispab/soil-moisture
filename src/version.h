@@ -1,2 +1,2 @@
-#define VERSION "V1.5, main:new range - 6,1630-3100"
+#define VERSION "V1.6, main:new range - 6:-1570-2980"
 
