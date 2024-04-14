@@ -28,14 +28,12 @@ LedFader blueBeatLED(ONBOARD_LED_PIN, 2, 0, 50, BLUE_BEAT_TIME);
 IPAddress mqttBroker(192, 168, 0, MQTT_LAST_OCTET);
 WiFiClient myWiFiClient;
 
-
 // forward func declarations
 void callback(char *topic, byte *payload, unsigned int length);
 PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
 unsigned int readAndTxMoistureSensor();
 void readAndPublishSingleRaw(const char *topic);
-void readAndPublishAverageRaw(unsigned int numReadings, unsigned int msBetweenReadings);
-
+unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msBetweenReadings);
 
 void setup() {
     Serial.begin(115200);
@@ -101,7 +99,6 @@ void setup() {
     MQTTclient.subscribe("soil1/read");
 }
 
-
 void loop() {
     connectWiFi();
     if (!MQTTclient.connected()) {
@@ -115,7 +112,6 @@ void loop() {
 
     readAndTxMoistureSensor();
 }
-
 
 #define MQTT_TRANSMIT_INTERVAL_MS (30 * 1000)  // MS DELAY BETWEEN SAMPLES
 unsigned int lastMQTTTransmitMs = millis() - MQTT_TRANSMIT_INTERVAL_MS - 1000;
@@ -146,10 +142,10 @@ unsigned int readAndTxMoistureSensor() {
         // publish telemetry
         MQTTclient.publish("soil1/version", VERSION);
         readAndPublishSingleRaw("soil1/moisture_raw");
-        readAndPublishAverageRaw(255, 50);
 
-        sensorValue = analogRead(SENSOR_PIN);
-        unsigned int moisture_raw = sensorValue;
+        unsigned int moisture_raw;
+        moisture_raw = readAndPublishAverageRaw(255, 50);
+        // sensorValue = analogRead(SENSOR_PIN);
         Serial.println(moisture_raw);
 
         // float DRY_SENSOR_MAX_RAW = 3950.0f;
@@ -163,7 +159,6 @@ unsigned int readAndTxMoistureSensor() {
     return sensorValue;
 }
 
-
 void MQTTpublishValue(const char *topic, unsigned int value) {
     char valueStr[20];  // max 16 chars string
     utoa(value, valueStr, 10);
@@ -172,16 +167,17 @@ void MQTTpublishValue(const char *topic, unsigned int value) {
 
 void readAndPublishSingleRaw(const char *topic) {
     unsigned int sensorValue;
+    analogRead(SENSOR_PIN);
     delay(100);
     sensorValue = analogRead(SENSOR_PIN);
     MQTTpublishValue(topic, sensorValue);
 }
 
-void readAndPublishAverageRaw(unsigned int numReadings, unsigned int msBetweenReadings) {
+unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msBetweenReadings) {
     // read in the data samples
     unsigned int readings[256];
     if (numReadings > 256) numReadings = 256;
-    //throw away first reading
+    // throw away first reading
     delay(msBetweenReadings);
     analogRead(SENSOR_PIN);
 
@@ -203,7 +199,24 @@ void readAndPublishAverageRaw(unsigned int numReadings, unsigned int msBetweenRe
         valuesTotal = valuesTotal + readings[i];
     }
     unsigned int averageValue = valuesTotal / numReadings;
+    // remove outliers
+    for (int i = 0; i < numReadings; i++) {
+        if (abs((int)readings[i] - (int)averageValue) > 5) {  // outlier
+
+            MQTTpublishValue("soil1/moisture2_outlier", readings[i]);
+            // replace with average
+            readings[i] - averageValue;
+        }
+    }
+    valuesTotal = 0;
+    for (int i = 0; i < numReadings; i++) {
+        valuesTotal = valuesTotal + readings[i];
+    }
+    averageValue = valuesTotal / numReadings;
+
     MQTTpublishValue("soil1/moisture2_average_raw", averageValue);
+
+    return averageValue;
 }
 
 // MQTT stuff
@@ -227,7 +240,6 @@ void callback(char *topic, byte *payload, unsigned int length) {
     readAndPublishSingleRaw("soil1/moisture_raw");
     readAndPublishAverageRaw(16, 200);
 }
-
 
 unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max) {
     if (reading > max) {
@@ -260,4 +272,3 @@ float scaleAndTransmit(unsigned int moistureReading, float DRY_SENSOR_MAX_RAW, f
     MQTTclient.publish(topic, normalisedSensorValueStr);
     return normalisedSensorValue;
 }
-
