@@ -110,11 +110,14 @@ void loop() {
     heartBeatLED.update();
     blueBeatLED.update();
 
+    // readAndPublishSingleRaw("soil/calibration");
+    // readAndPublishSingleRaw("soil1/moisture2_average_raw");
+    // delay(1000);
     readAndTxMoistureSensor();
 }
 
-#define MQTT_TRANSMIT_INTERVAL_MS (30 * 1000)  // MS DELAY BETWEEN SAMPLES
-unsigned int lastMQTTTransmitMs = millis() - MQTT_TRANSMIT_INTERVAL_MS - 1000;
+#define MQTT_TELE_PERIOD_MS (30 * 1000)  // MS DELAY BETWEEN
+unsigned int lastMQTTTransmitMs = millis() - MQTT_TELE_PERIOD_MS - 1000;
 float prevFilteredValue = 0.0;
 #define RUNNING_SAMPLE_INTERVAL_MS (20 * 1000)
 unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000;
@@ -124,11 +127,7 @@ float scaleAndTransmit(unsigned int moistureReading, float DRY_SENSOR_MAX_RAW, f
 unsigned int readAndTxMoistureSensor() {
     unsigned int now = millis();
     unsigned int sensorValue;
-    // char sensorValueStr[17];                   // max 16 chars string
-    // char normalisedSensorValueStr[17];         // max 16 chars string
-    // char normalisedRangeSensorValueStr[17];    // max 16 chars string
-    // char newFilterdValueStr[17];               // max 16 chars string newFilterdValue
-    // char normalisedRangeSensorValue_6Str[17];  // max 16 chars string
+
 
     sensorValue = 0;
     if (now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL_MS) {
@@ -136,7 +135,7 @@ unsigned int readAndTxMoistureSensor() {
         runningSensorReading = (((runningSensorReading * 80) / 100) + ((analogRead(SENSOR_PIN) * 20) / 100));
         lastMoistureSampleMs = now;
     }
-    if (now - lastMQTTTransmitMs > MQTT_TRANSMIT_INTERVAL_MS) {
+    if (now - lastMQTTTransmitMs > MQTT_TELE_PERIOD_MS) {
         lastMQTTTransmitMs = now;
 
         // publish telemetry
@@ -152,8 +151,12 @@ unsigned int readAndTxMoistureSensor() {
         // float WET_SENSOR_MIN_RAW = 1500.0f;
         // const RAW_0PC_DRY = 3300.0;
         // const RAW_100PC_WET = 2500.0;
-        float DRY_SENSOR_MAX_RAW = 3300.0f;
-        float WET_SENSOR_MIN_RAW = 2500.0f;
+        // float DRY_SENSOR_MAX_RAW = 3300.0f;
+        // float WET_SENSOR_MIN_RAW = 2500.0f;
+        // const RAW_0PC_DRY = 2770.0;
+        // const RAW_100PC_WET = 2066.0;
+        float DRY_SENSOR_MAX_RAW = 2770.0f;
+        float WET_SENSOR_MIN_RAW = 2066.0f;
         scaleAndTransmit(moisture_raw, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW, "soil1/moisture");
     }
     return sensorValue;
@@ -205,7 +208,7 @@ unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msB
 
             MQTTpublishValue("soil1/moisture2_outlier", readings[i]);
             // replace with average
-            readings[i] - averageValue;
+            readings[i] = averageValue;
         }
     }
     valuesTotal = 0;
@@ -261,8 +264,8 @@ float scaleAndTransmit(unsigned int moistureReading, float DRY_SENSOR_MAX_RAW, f
     //  to scale to 0-100, scaled = (raw_range/100) * flipped
     char normalisedSensorValueStr[17];  // max 16 chars string
     float RAW_RANGE = (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW);
-    // unsigned int limitedSensorValue = limitSensorValue(moistureReading, WET_SENSOR_MIN_RAW, DRY_SENSOR_MAX_RAW);
-    unsigned int limitedSensorValue = moistureReading;
+    unsigned int limitedSensorValue = limitSensorValue(moistureReading, WET_SENSOR_MIN_RAW, DRY_SENSOR_MAX_RAW);
+    // unsigned int limitedSensorValue = moistureReading;
     float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)limitedSensorValue - WET_SENSOR_MIN_RAW)) / (RAW_RANGE / 100.0f);
     // convert float to 1dp string
     sprintf(normalisedSensorValueStr, "%.1f", normalisedSensorValue);  // make the number into string using sprintf function
