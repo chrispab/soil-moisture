@@ -34,7 +34,8 @@ PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
 unsigned int readAndTxMoistureSensor();
 void readAndPublishSingleRaw(const char *topic);
 unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msBetweenReadings);
-
+void method_averageRaw(unsigned int readings[256], unsigned int numReadings);
+unsigned int getModeValue(unsigned int a[], unsigned int n);
 void setup() {
     Serial.begin(115200);
     while (!Serial)  // Wait for the serial connection to be establised.
@@ -128,7 +129,6 @@ unsigned int readAndTxMoistureSensor() {
     unsigned int now = millis();
     unsigned int sensorValue;
 
-
     sensorValue = 0;
     if (now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL_MS) {
         // runningSensorReading = (runningSensorReading + analogRead(SENSOR_PIN))/2;
@@ -140,11 +140,11 @@ unsigned int readAndTxMoistureSensor() {
 
         // publish telemetry
         MQTTclient.publish("soil1/version", VERSION);
+
         readAndPublishSingleRaw("soil1/moisture_raw");
 
         unsigned int moisture_raw;
         moisture_raw = readAndPublishAverageRaw(255, 50);
-        // sensorValue = analogRead(SENSOR_PIN);
         Serial.println(moisture_raw);
 
         // float DRY_SENSOR_MAX_RAW = 3950.0f;
@@ -189,18 +189,18 @@ unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msB
         readings[i] = analogRead(SENSOR_PIN);
     }
 
-    // method 1
-    unsigned int aveSensorValue = readings[0];
-    for (int i = 1; i < numReadings; i++) {
-        aveSensorValue = (aveSensorValue + readings[i]) / 2;
-    }
-    MQTTpublishValue("soil1/moisture1_average_raw", aveSensorValue);
+    method_averageRaw(readings, numReadings);
+
+    // find most common value
+    unsigned int modeValue = getModeValue(readings, numReadings);
+    MQTTpublishValue("soil1/moisture_mode", modeValue);
 
     // method 2
     unsigned int valuesTotal = 0;
     for (int i = 0; i < numReadings; i++) {
         valuesTotal = valuesTotal + readings[i];
     }
+
     unsigned int averageValue = valuesTotal / numReadings;
     // remove outliers
     for (int i = 0; i < numReadings; i++) {
@@ -221,7 +221,45 @@ unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msB
 
     return averageValue;
 }
+void method_averageRaw(unsigned int readings[], unsigned int numReadings) {
+    // method 1
+    unsigned int aveSensorValue = readings[0];
+    for (int i = 1; i < numReadings; i++) {
+        aveSensorValue = (aveSensorValue + readings[i]) / 2;
+    }
+    MQTTpublishValue("soil1/moisture_average_raw", aveSensorValue);
+}
 
+
+/**
+ * Finds the value that occurs most frequently in the given array.
+ *
+ * @param a The array of unsigned integers.
+ * @param n The size of the array.
+ *
+ * @return The value that occurs most frequently in the array.
+ *
+ * @throws None.
+ */
+unsigned int getModeValue(unsigned int a[], unsigned int n) {
+    unsigned int maxValue = 0, maxCount = 0, i, j;
+
+    for (i = 0; i < n; ++i) {
+        unsigned int count = 0;
+
+        for (j = 0; j < n; ++j) {
+            if (a[j] == a[i])
+                ++count;
+        }
+
+        if (count > maxCount) {
+            maxCount = count;
+            maxValue = a[i];
+        }
+    }
+
+    return maxValue;
+}
 // MQTT stuff
 void callback(char *topic, byte *payload, unsigned int length) {
     // handle message arrived
