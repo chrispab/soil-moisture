@@ -24,6 +24,16 @@
 
 #define SENSOR_PIN GPIO_NUM_36
 
+// float DRY_SENSOR_MAX_RAW = 3950.0f;
+// float WET_SENSOR_MIN_RAW = 1500.0f;
+// const RAW_0PC_DRY = 3300.0;
+// const RAW_100PC_WET = 2500.0;
+// float DRY_SENSOR_MAX_RAW = 3300.0f;
+// float WET_SENSOR_MIN_RAW = 2500.0f;
+// const RAW_0PC_DRY = 2770.0;
+// const RAW_100PC_WET = 2066.0;
+// float DRY_SENSOR_MAX_RAW = 2770.0f;
+// float WET_SENSOR_MIN_RAW = 2000.0f;
 // float DRY_SENSOR_MAX_RAW = 2770.0f;
 // float WET_SENSOR_MIN_RAW = 2000.0f;
 #define DRY_SENSOR_MAX_RAW 2770
@@ -39,4 +49,4 @@
 
 // to flip ,flipped =  abs( (dry_max_raw - wet_min_raw) - inverted_reading ), gives o-dry to raw_range-wet
 //  to scale to 0-100, scaled = (raw_range/100) * flipped
-#endif // __SETTINGS_H
+#endif  // __SETTINGS_H

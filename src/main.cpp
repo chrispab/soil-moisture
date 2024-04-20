@@ -36,6 +36,8 @@ void readAndPublishSingleRaw(const char *topic);
 unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetweenReadings);
 void method_averageRaw(unsigned int readings[256], unsigned int numReadings);
 unsigned int getModeValue(unsigned int a[], unsigned int n);
+unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadings);
+
 void setup() {
     Serial.begin(115200);
     while (!Serial)  // Wait for the serial connection to be establised.
@@ -144,27 +146,26 @@ unsigned int readAndTxMoistureSensor() {
         readAndPublishSingleRaw("soil1/moisture_raw");
 
         unsigned int moisture_raw;
-        moisture_raw = readMethodsPublish(255, 50);
+        moisture_raw = readMethodsPublish(255, 90);
         Serial.println(moisture_raw);
 
-        // float DRY_SENSOR_MAX_RAW = 3950.0f;
-        // float WET_SENSOR_MIN_RAW = 1500.0f;
-        // const RAW_0PC_DRY = 3300.0;
-        // const RAW_100PC_WET = 2500.0;
-        // float DRY_SENSOR_MAX_RAW = 3300.0f;
-        // float WET_SENSOR_MIN_RAW = 2500.0f;
-        // const RAW_0PC_DRY = 2770.0;
-        // const RAW_100PC_WET = 2066.0;
-        // float DRY_SENSOR_MAX_RAW = 2770.0f;
-        // float WET_SENSOR_MIN_RAW = 2000.0f;
+
         scaleAndTransmit(moisture_raw, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW, "soil1/moisture");
     }
     return sensorValue;
 }
 
+/**
+ * Publishes a value to the specified MQTT topic.
+ *
+ * @param topic the topic to publish the value to
+ * @param value the value to publish
+ *
+ * @throws ErrorType if there is an error publishing the value
+ */
 void MQTTpublishValue(const char *topic, unsigned int value) {
-    char valueStr[20];  // max 16 chars string
-    utoa(value, valueStr, 10);
+    char valueStr[20];  // max of 20 chars string
+    utoa(value, valueStr, DECIMAL);
     MQTTclient.publish(topic, valueStr);
 }
 
@@ -183,6 +184,22 @@ void readAndPublishSingleRaw(const char *topic) {
     MQTTpublishValue(topic, sensorValue);
 }
 
+/**
+ * Reads a specified number of analog readings from a sensor pin and publishes
+ * the results using different methods. The first reading is discarded and the
+ * readings are spaced apart by a specified time interval. The methods used are:
+ * 1. Average of raw readings.
+ * 2. Finds the most common value in the readings.
+ * 3. Removes outliers from the readings by replacing them with the average value
+ *    and then averages the remaining values.
+ *
+ * @param numReadings The number of readings to take. Limited to a maximum of 256.
+ * @param msBetweenReadings The time interval between each reading in milliseconds.
+ *
+ * @return The average value of the readings after outliers are removed.
+ *
+ * @throws None
+ */
 unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetweenReadings) {
     // limit readings to max of 256 samples
     unsigned int readings[256];
@@ -206,27 +223,28 @@ unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetween
     MQTTpublishValue("soil1/moisture_mode", modeValue);
 
     // method 3 - remove outliers, then average
-    unsigned int valuesTotal = 0;
-    for (int i = 0; i < numReadings; i++) {
-        valuesTotal = valuesTotal + readings[i];
-    }
-    unsigned int averageValue = valuesTotal / numReadings;
+    unsigned int averageValue = getAverageOfReadings(readings, numReadings);
     // remove outliers
+    int outlierLimit = 3;
     for (int i = 0; i < numReadings; i++) {
-        if (abs((int)readings[i] - (int)averageValue) > 5) {  // outlier
+        if (abs((int)readings[i] - (int)averageValue) > outlierLimit) {  // outlier
             MQTTpublishValue("soil1/moisture2_outlier", readings[i]);
             // replace with average
             readings[i] = averageValue;
         }
     }
-    valuesTotal = 0;
-    for (int i = 0; i < numReadings; i++) {
-        valuesTotal = valuesTotal + readings[i];
-    }
-    averageValue = valuesTotal / numReadings;
+    averageValue = getAverageOfReadings(readings, numReadings);
     MQTTpublishValue("soil1/moisture2_average_raw", averageValue);
 
     return averageValue;
+}
+
+unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadings) {
+        unsigned int valuesTotal = 0;
+        for (int i = 0; i < numReadings; i++) {
+        valuesTotal = valuesTotal + readings[i];
+    }
+    return valuesTotal / numReadings;
 }
 /**
  * Calculates the average value of an array of unsigned integers.
@@ -240,10 +258,11 @@ unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetween
  */
 void method_averageRaw(unsigned int readings[], unsigned int numReadings) {
     // method 1
-    unsigned int aveSensorValue = readings[0];
-    for (int i = 1; i < numReadings; i++) {
-        aveSensorValue = (aveSensorValue + readings[i]) / 2;
-    }
+    unsigned int aveSensorValue = 0;
+    // for (int i = 1; i < numReadings; i++) {
+    //     aveSensorValue = (aveSensorValue + readings[i]) / 2;
+    // }
+    aveSensorValue= getAverageOfReadings(readings, numReadings);
     MQTTpublishValue("soil1/moisture_average_raw", aveSensorValue);
 }
 
@@ -277,6 +296,17 @@ unsigned int getModeValue(unsigned int a[], unsigned int n) {
     return maxValue;
 }
 // MQTT stuff
+
+
+    /**
+     * Callback function for handling MQTT message arrival.
+     *
+     * @param topic The topic of the MQTT message.
+     * @param payload The payload of the MQTT message.
+     * @param length The length of the payload.
+     *
+     * @throws None
+     */
 void callback(char *topic, byte *payload, unsigned int length) {
     // handle message arrived
     // format and display the whole MQTT message and payload
