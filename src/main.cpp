@@ -33,7 +33,7 @@ void callback(char *topic, byte *payload, unsigned int length);
 PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
 unsigned int readAndTxMoistureSensor();
 void readAndPublishSingleRaw(const char *topic);
-unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msBetweenReadings);
+unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetweenReadings);
 void method_averageRaw(unsigned int readings[256], unsigned int numReadings);
 unsigned int getModeValue(unsigned int a[], unsigned int n);
 void setup() {
@@ -117,13 +117,13 @@ void loop() {
     readAndTxMoistureSensor();
 }
 
-#define MQTT_TELE_PERIOD_MS (30 * 1000)  // MS DELAY BETWEEN
+#define MQTT_TELE_PERIOD_MS (60 * 1000)  // MS DELAY BETWEEN
 unsigned int lastMQTTTransmitMs = millis() - MQTT_TELE_PERIOD_MS - 1000;
 float prevFilteredValue = 0.0;
 #define RUNNING_SAMPLE_INTERVAL_MS (20 * 1000)
 unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000;
 unsigned int runningSensorReading = analogRead(SENSOR_PIN);  // running total reading - taken every RUNNING_SAMPLE_INTERVAL_MS
-float scaleAndTransmit(unsigned int moistureReading, float DRY_SENSOR_MAX_RAW, float WET_SENSOR_MIN_RAW, const char *topic);
+float scaleAndTransmit(unsigned int moistureReading, float drySensorMaxRaw, float wetSensorMinRaw, const char *topic);
 
 unsigned int readAndTxMoistureSensor() {
     unsigned int now = millis();
@@ -144,7 +144,7 @@ unsigned int readAndTxMoistureSensor() {
         readAndPublishSingleRaw("soil1/moisture_raw");
 
         unsigned int moisture_raw;
-        moisture_raw = readAndPublishAverageRaw(255, 50);
+        moisture_raw = readMethodsPublish(255, 50);
         Serial.println(moisture_raw);
 
         // float DRY_SENSOR_MAX_RAW = 3950.0f;
@@ -155,8 +155,8 @@ unsigned int readAndTxMoistureSensor() {
         // float WET_SENSOR_MIN_RAW = 2500.0f;
         // const RAW_0PC_DRY = 2770.0;
         // const RAW_100PC_WET = 2066.0;
-        float DRY_SENSOR_MAX_RAW = 2770.0f;
-        float WET_SENSOR_MIN_RAW = 2066.0f;
+        // float DRY_SENSOR_MAX_RAW = 2770.0f;
+        // float WET_SENSOR_MIN_RAW = 2000.0f;
         scaleAndTransmit(moisture_raw, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW, "soil1/moisture");
     }
     return sensorValue;
@@ -168,44 +168,52 @@ void MQTTpublishValue(const char *topic, unsigned int value) {
     MQTTclient.publish(topic, valueStr);
 }
 
+/**
+ * Reads the value from the sensor connected to SENSOR_PIN and publishes it to the specified MQTT topic.
+ *
+ * @param topic The MQTT topic to publish the sensor value to.
+ *
+ * @throws None
+ */
 void readAndPublishSingleRaw(const char *topic) {
     unsigned int sensorValue;
-    analogRead(SENSOR_PIN);
-    delay(100);
+    // analogRead(SENSOR_PIN);
+    // delay(100);
     sensorValue = analogRead(SENSOR_PIN);
     MQTTpublishValue(topic, sensorValue);
 }
 
-unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msBetweenReadings) {
-    // read in the data samples
+unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetweenReadings) {
+    // limit readings to max of 256 samples
     unsigned int readings[256];
     if (numReadings > 256) numReadings = 256;
+
     // throw away first reading
     delay(msBetweenReadings);
     analogRead(SENSOR_PIN);
 
+    // read in the samples
     for (int i = 0; i < numReadings; i++) {
         delay(msBetweenReadings);
         readings[i] = analogRead(SENSOR_PIN);
     }
 
+    // method 1
     method_averageRaw(readings, numReadings);
 
-    // find most common value
+    // method 2 - find most common value
     unsigned int modeValue = getModeValue(readings, numReadings);
     MQTTpublishValue("soil1/moisture_mode", modeValue);
 
-    // method 2
+    // method 3 - remove outliers, then average
     unsigned int valuesTotal = 0;
     for (int i = 0; i < numReadings; i++) {
         valuesTotal = valuesTotal + readings[i];
     }
-
     unsigned int averageValue = valuesTotal / numReadings;
     // remove outliers
     for (int i = 0; i < numReadings; i++) {
         if (abs((int)readings[i] - (int)averageValue) > 5) {  // outlier
-
             MQTTpublishValue("soil1/moisture2_outlier", readings[i]);
             // replace with average
             readings[i] = averageValue;
@@ -216,11 +224,20 @@ unsigned int readAndPublishAverageRaw(unsigned int numReadings, unsigned int msB
         valuesTotal = valuesTotal + readings[i];
     }
     averageValue = valuesTotal / numReadings;
-
     MQTTpublishValue("soil1/moisture2_average_raw", averageValue);
 
     return averageValue;
 }
+/**
+ * Calculates the average value of an array of unsigned integers.
+ *
+ * @param readings An array of unsigned integers representing sensor readings.
+ * @param numReadings The number of readings in the array.
+ *
+ * @return The average value of the sensor readings.
+ *
+ * @throws None.
+ */
 void method_averageRaw(unsigned int readings[], unsigned int numReadings) {
     // method 1
     unsigned int aveSensorValue = readings[0];
@@ -229,7 +246,6 @@ void method_averageRaw(unsigned int readings[], unsigned int numReadings) {
     }
     MQTTpublishValue("soil1/moisture_average_raw", aveSensorValue);
 }
-
 
 /**
  * Finds the value that occurs most frequently in the given array.
@@ -279,7 +295,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
     Serial.println(fullMQTTmessage);
 
     readAndPublishSingleRaw("soil1/moisture_raw");
-    readAndPublishAverageRaw(16, 200);
+    readMethodsPublish(16, 200);
 }
 
 unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max) {
@@ -292,7 +308,7 @@ unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned i
     return reading;
 }
 
-float scaleAndTransmit(unsigned int moistureReading, float DRY_SENSOR_MAX_RAW, float WET_SENSOR_MIN_RAW, const char *topic) {
+float scaleAndTransmit(unsigned int moistureReading, float drySensorMaxRaw, float wetSensorMinRaw, const char *topic) {
     // for a 0-100 output range
     // get range raw / 100 ggives steps per %
     // raw range = 3960 - 1530
@@ -301,10 +317,10 @@ float scaleAndTransmit(unsigned int moistureReading, float DRY_SENSOR_MAX_RAW, f
     // to flip ,flipped =  abs( (dry_max_raw - wet_min_raw) - inverted_reading_0_to_range ), gives o-dry to raw_range-wet
     //  to scale to 0-100, scaled = (raw_range/100) * flipped
     char normalisedSensorValueStr[17];  // max 16 chars string
-    float RAW_RANGE = (DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW);
-    unsigned int limitedSensorValue = limitSensorValue(moistureReading, WET_SENSOR_MIN_RAW, DRY_SENSOR_MAX_RAW);
+    float RAW_RANGE = (drySensorMaxRaw - wetSensorMinRaw);
+    unsigned int limitedSensorValue = limitSensorValue(moistureReading, wetSensorMinRaw, drySensorMaxRaw);
     // unsigned int limitedSensorValue = moistureReading;
-    float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)limitedSensorValue - WET_SENSOR_MIN_RAW)) / (RAW_RANGE / 100.0f);
+    float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)limitedSensorValue - wetSensorMinRaw)) / (RAW_RANGE / 100.0f);
     // convert float to 1dp string
     sprintf(normalisedSensorValueStr, "%.1f", normalisedSensorValue);  // make the number into string using sprintf function
     // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");      // Serial.println((RAW_RANGE / 100.0f));
