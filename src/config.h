@@ -36,8 +36,13 @@
 // float WET_SENSOR_MIN_RAW = 2000.0f;
 // float DRY_SENSOR_MAX_RAW = 2770.0f;
 // float WET_SENSOR_MIN_RAW = 2000.0f;
-#define DRY_SENSOR_MAX_RAW 2020
-#define WET_SENSOR_MIN_RAW 1700
+// #define DRY_SENSOR_MAX_RAW 2020
+// #define WET_SENSOR_MIN_RAW 1700
+//with plastic bag
+// const RAW_0PC_DRY = 2135.0;
+// const RAW_100PC_WET = 1655.0;
+#define DRY_SENSOR_MAX_RAW 2135
+#define WET_SENSOR_MIN_RAW 1655
 // #define RAW_RANGE   DRY_SENSOR_MAX_RAW - WET_SENSOR_MIN_RAW
 
 // for a 0-100 output range
