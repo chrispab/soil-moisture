@@ -22,6 +22,9 @@
 #define HEART_BEAT_TIME 800
 #define BLUE_BEAT_TIME 300
 
+// Outlier limit for sensor readings
+#define OUTLIER_LIMIT 4
+
 LedFader heartBeatLED(GREEN_LED_PIN, 1, 0, 255, HEART_BEAT_TIME);
 LedFader blueBeatLED(ONBOARD_LED_PIN, 2, 0, 50, BLUE_BEAT_TIME);
 
@@ -146,7 +149,8 @@ unsigned int readAndTxMoistureSensor() {
         MQTTclient.publish("soil1/version", VERSION);
 
         // do all the different methods
-        moisture_raw = readMethodsPublish(255, 50);
+        unsigned int numReadings = 255;
+        moisture_raw = readMethodsPublish(numReadings, 50);
         Serial.println(moisture_raw);
 
         scaleAndTransmit(moisture_raw, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW, "soil1/moisture_pc");
@@ -199,7 +203,7 @@ void readAndPublishSingleRaw(const char *topic) {
  *
  * @throws None
  */
-unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetweenReadings) {
+unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetweenReadings) {
     // limit readings to max of 256 samples
     unsigned int readings[256];
     getReadings(numReadings, msBetweenReadings, readings);
@@ -216,13 +220,13 @@ unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetween
     // method 3 - remove outliers, then average
     unsigned int averageValue = getAverageOfReadings(readings, numReadings);
     // remove outliers
-    int outlierLimit = 4;
-    for (int i = 0; i < numReadings; i++) {
-        if (abs((int)readings[i] - (int)averageValue) > outlierLimit) {  // outlier
+    for (unsigned int i = 0; i < numReadings; i++) {
+        if (abs((int)readings[i] - (int)averageValue) > OUTLIER_LIMIT) {  // outlier
             MQTTpublishValue("soil1/moisture_method3_excluded", readings[i]);
             // replace with average
             readings[i] = averageValue;
         }
+    }
     }
     averageValue = getAverageOfReadings(readings, numReadings);
     MQTTpublishValue("soil1/moisture_method3_average", averageValue);
@@ -254,16 +258,7 @@ void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsi
     // return readings;
 }
 
-/**
- * Calculates the average value of an array of unsigned integers.
- *
- * @param readings An array of unsigned integers representing sensor readings.
- * @param numReadings The number of readings in the array.
- *
- * @return The average value of the readings.
- *
- * @throws None.
- */
+
 unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadings) {
     if (numReadings == 0) {
         return 0;
@@ -351,7 +346,8 @@ void callback(char *topic, byte *payload, unsigned int length) {
     Serial.println(fullMQTTmessage);
 
     readAndPublishSingleRaw("soil1/moisture_raw");
-    readMethodsPublish(16, 200);
+    unsigned int numReadings = 16;
+    readMethodsPublish(numReadings, 200);
 }
 
 unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max) {
