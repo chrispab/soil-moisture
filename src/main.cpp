@@ -247,7 +247,7 @@ void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsi
     analogRead(SENSOR_PIN);
 
     // read in the samples
-    for (int i = 0; i < numReadings; i++) {
+    for (unsigned int i = 0; i < numReadings; i++) {
         delay(msBetweenReadings);
         readings[i] = analogRead(SENSOR_PIN);
     }
@@ -265,12 +265,17 @@ void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsi
  * @throws None.
  */
 unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadings) {
+    if (numReadings == 0) {
+        return 0;
+    }
     unsigned int valuesTotal = 0;
     for (int i = 0; i < numReadings; i++) {
         valuesTotal = valuesTotal + readings[i];
     }
     return valuesTotal / numReadings;
 }
+
+
 /**
  * Calculates the average value of an array of unsigned integers.
  *
