@@ -36,7 +36,7 @@ void callback(char *topic, byte *payload, unsigned int length);
 PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
 unsigned int readAndTxMoistureSensor();
 void readAndPublishSingleRaw(const char *topic);
-unsigned int readMethodsPublish(unsigned int numReadings, unsigned int msBetweenReadings);
+unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetweenReadings);
 void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[256]);
 void method_averageRaw(const char *topic, unsigned int readings[], unsigned int numReadings);
 unsigned int getModeValue(unsigned int a[], unsigned int n);
@@ -227,10 +227,8 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
             readings[i] = averageValue;
         }
     }
-    }
     averageValue = getAverageOfReadings(readings, numReadings);
     MQTTpublishValue("soil1/moisture_method3_average", averageValue);
-
     return averageValue;
 }
 
@@ -347,7 +345,7 @@ void callback(char *topic, byte *payload, unsigned int length) {
 
     readAndPublishSingleRaw("soil1/moisture_raw");
     unsigned int numReadings = 16;
-    readMethodsPublish(numReadings, 200);
+    readMethodsPublish(numReadings, 200U);
 }
 
 unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max) {
