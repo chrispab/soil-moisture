@@ -41,7 +41,7 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
 void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[256]);
 void method_averageRaw(const char *topic, unsigned int readings[], unsigned int numReadings);
 unsigned int getModeValue(unsigned int a[], unsigned int n);
-unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadings);
+unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int numReadings);
 
 void setup() {
     Serial.begin(115200);
@@ -189,6 +189,21 @@ void readAndPublishSingleRaw(const char *topic) {
 }
 
 /**
+ * Reads a single raw analog value from the sensor connected to SENSOR_PIN.
+ *
+ * @return The raw sensor value as a 16-bit unsigned integer.
+ */
+uint16_t readRaw() {
+    return analogRead(SENSOR_PIN);
+}
+
+
+//Publish a value to the given topic
+void publishValueToTopic(const char* topic, uint16_t value) {
+    MQTTpublishValue(topic, value);
+}
+
+/**
  * Reads a specified number of analog readings from a sensor pin and publishes
  * the results using different methods. The first reading is discarded and the
  * readings are spaced apart by a specified time interval. The methods used are:
@@ -208,6 +223,9 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     // limit readings to max of MAX_READINGS samples
     unsigned int readings[MAX_READINGS];
     getReadings(numReadings, msBetweenReadings, readings);
+
+    //method 0 - just read raw
+    publishValueToTopic("soil1/moisture_raw", readRaw());
 
     readAndPublishSingleRaw("soil1/moisture_method0_single");
 
@@ -259,7 +277,16 @@ void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsi
 }
 
 
-unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadings) {
+/**
+ * Calculates the average value of an array of unsigned integers.
+ *
+ * Integer division is used, so the result is truncated (not rounded).
+ *
+ * @param readings An array of unsigned integers representing sensor readings.
+ * @param numReadings The number of readings in the array.
+ * @return The average value of the sensor readings, or 0 if numReadings is 0.
+ */
+unsigned int getAverageOfReadings(const unsigned int* readings, unsigned int numReadings) {
     if (numReadings == 0) {
         return 0;
     }
@@ -270,6 +297,7 @@ unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadi
     // Integer division is used here; the result will be truncated to an integer.
     return valuesTotal / numReadings;
 }
+
 
 
 /**
