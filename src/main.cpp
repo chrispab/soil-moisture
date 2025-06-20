@@ -263,9 +263,9 @@ unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadi
     if (numReadings == 0) {
         return 0;
     }
-    unsigned int valuesTotal = 0;
+    unsigned long valuesTotal = 0;
     for (unsigned int i = 0; i < numReadings; i++) {
-        valuesTotal = valuesTotal + readings[i];
+        valuesTotal += readings[i];
     }
     // Integer division is used here; the result will be truncated to an integer.
     return valuesTotal / numReadings;
