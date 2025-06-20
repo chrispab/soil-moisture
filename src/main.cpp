@@ -24,6 +24,7 @@
 
 // Outlier limit for sensor readings
 #define OUTLIER_LIMIT 4
+#define MAX_READINGS 256
 
 LedFader heartBeatLED(GREEN_LED_PIN, 1, 0, 255, HEART_BEAT_TIME);
 LedFader blueBeatLED(ONBOARD_LED_PIN, 2, 0, 50, BLUE_BEAT_TIME);
@@ -204,8 +205,8 @@ void readAndPublishSingleRaw(const char *topic) {
  * @throws None
  */
 unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetweenReadings) {
-    // limit readings to max of 256 samples
-    unsigned int readings[256];
+    // limit readings to max of MAX_READINGS samples
+    unsigned int readings[MAX_READINGS];
     getReadings(numReadings, msBetweenReadings, readings);
 
     readAndPublishSingleRaw("soil1/moisture_method0_single");
@@ -241,10 +242,11 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
  *
  * @throws None
  */
-void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[256]) {
-    if (numReadings > 256) numReadings = 256;
+void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[MAX_READINGS]) {
+    if (numReadings > MAX_READINGS) numReadings = MAX_READINGS;
+    if (numReadings == 0) numReadings = 1;
 
-    // throw away first reading
+    // Discard the first reading to stabilize the ADC (common practice for more reliable sensor data)
     delay(msBetweenReadings);
     analogRead(SENSOR_PIN);
 
@@ -262,9 +264,10 @@ unsigned int getAverageOfReadings(unsigned int readings[], unsigned int numReadi
         return 0;
     }
     unsigned int valuesTotal = 0;
-    for (int i = 0; i < numReadings; i++) {
+    for (unsigned int i = 0; i < numReadings; i++) {
         valuesTotal = valuesTotal + readings[i];
     }
+    // Integer division is used here; the result will be truncated to an integer.
     return valuesTotal / numReadings;
 }
 
