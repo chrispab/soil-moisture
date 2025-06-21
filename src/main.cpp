@@ -263,9 +263,9 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     MQTTpublishValue("soil1/moisture_method3_average", averageValue);
     MQTTpublishValue("soil1/sensor_method3_average", averageValue);
 
+// method 4 - a moving average of the last 10 readings
 #define READINGS_WINDOW 10
 
-    // method 4 - a moving average of the last 10 readings
     static unsigned int movingAverageReadings[READINGS_WINDOW];
     static unsigned int movingAverageCount = 0;
     if (movingAverageCount < READINGS_WINDOW) {
@@ -281,8 +281,8 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     MQTTpublishValue("soil1/moisture_method4_moving_average", movingAverageValue);
     MQTTpublishValue("soil1/sensor_method4_moving_average", movingAverageValue);
 
-    // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
-    #define READINGS_FLOAT_WINDOW 20
+// method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
+#define READINGS_FLOAT_WINDOW 20
 
     static float movingAverageReadingsFloat[READINGS_FLOAT_WINDOW];
     static unsigned int movingAverageCountFloat = 0;
@@ -301,7 +301,6 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     movingAverageValueFloat = roundf(movingAverageValueFloat * 10.0f) / 10.0f;
     MQTTpublishValue("soil1/moisture_method5_moving_average_float", movingAverageValueFloat);
     MQTTpublishValue("soil1/sensor_method5_moving_average_float", movingAverageValueFloat);
-
 
     return averageValue;
 }
