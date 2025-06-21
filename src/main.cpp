@@ -256,16 +256,16 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
  *
  * @param numReadings Reference to an unsigned integer that holds the number of readings to take. Limited to a maximum of 256.
  * @param msBetweenReadings The time interval between each reading in milliseconds.
- * @param readings An array of unsigned integers that will hold the readings. The array must have a size of at least `numReadings`.
+ * @param readings An array of unsigned integers that will hold the readings. The array must have a size of at least `numReadings` (does not need to be `MAX_READINGS`).
  *
  * @throws None
  */
-void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[MAX_READINGS]) {
+void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[]) {
     if (numReadings > MAX_READINGS) numReadings = MAX_READINGS;
     if (numReadings == 0) numReadings = 1;
 
     // Discard the first reading to stabilize the ADC (common practice for more reliable sensor data)
-    delay(msBetweenReadings);
+    // delay(msBetweenReadings);
     analogRead(SENSOR_PIN);
 
     // read in the samples
@@ -273,7 +273,6 @@ void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsi
         delay(msBetweenReadings);
         readings[i] = analogRead(SENSOR_PIN);
     }
-    // return readings;
 }
 
 
@@ -328,7 +327,10 @@ void method_averageRaw(const char *topic, unsigned int readings[], unsigned int 
  * @throws None.
  */
 unsigned int getModeValue(unsigned int a[], unsigned int n) {
-    unsigned int maxValue = 0, maxCount = 0, i, j;
+    unsigned int maxValue = 0;
+    unsigned int maxCount = 0;
+    unsigned int i;
+    unsigned int j;
 
     for (i = 0; i < n; ++i) {
         unsigned int count = 0;
@@ -375,8 +377,8 @@ void callback(char *topic, byte *payload, unsigned int length) {
     Serial.println(fullMQTTmessage);
 
     readAndPublishSingleRaw("soil1/moisture_raw");
-    unsigned int numReadings = 16;
-    readMethodsPublish(numReadings, 200U);
+    // unsigned int numReadings = 32;
+    // readMethodsPublish(numReadings, 200U);
 }
 
 unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max) {
