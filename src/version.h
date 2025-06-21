@@ -1,2 +1,2 @@
-#define VERSION "V1.39 mov float"
+#define VERSION "V1.40 mov float"
 

@@ -175,6 +175,12 @@ void MQTTpublishValue(const char *topic, unsigned int value) {
     MQTTclient.publish(topic, valueStr);
 }
 
+void MQTTpublishValue(const char *topic, float value) {
+    char valueStr[20];
+    dtostrf(value, 0, 1, valueStr);  // 1 decimal place
+    MQTTclient.publish(topic, valueStr);
+}
+
 /**
  * Reads the value from the sensor connected to SENSOR_PIN and publishes it to the specified MQTT topic.
  *
@@ -201,7 +207,7 @@ uint16_t readRaw() {
 
 // Publish a value to the given topic
 void publishValueToTopic(const char *topic, uint16_t value) {
-    MQTTpublishValue(topic, value);
+    MQTTpublishValue(topic, static_cast<unsigned int>(value));
 }
 
 /**
@@ -226,16 +232,21 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     getReadings(numReadings, msBetweenReadings, readings);
 
     // method 0 - just read raw
-    publishValueToTopic("soil1/moisture_raw", readRaw());
-
-    readAndPublishSingleRaw("soil1/moisture_method0_single");
+    uint16_t rawValue = readRaw();
+    Serial.print("Raw sensor value: ");
+    Serial.println(rawValue);
+    publishValueToTopic("soil1/moisture_raw", rawValue);
+    publishValueToTopic("soil1/sensor_method0_single_raw", rawValue);
+    // readAndPublishSingleRaw("soil1/sensor_method0_single_raw");
 
     // method 1
     method_averageRaw("soil1/moisture_method1_average", readings, numReadings);
+    method_averageRaw("soil1/sensor_method1_average", readings, numReadings);
 
     // method 2 - find most common value
     unsigned int modeValue = getModeValue(readings, numReadings);
     MQTTpublishValue("soil1/moisture_method2_mode", modeValue);
+    MQTTpublishValue("soil1/sensor_method2_mode", modeValue);
 
     // method 3 - remove outliers, then average
     unsigned int averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
@@ -243,12 +254,14 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     for (unsigned int i = 0; i < numReadings; i++) {
         if (abs((int)readings[i] - (int)averageValue) > OUTLIER_LIMIT) {  // outlier
             MQTTpublishValue("soil1/moisture_method3_excluded", readings[i]);
+            MQTTpublishValue("soil1/sensor_method3_excluded", readings[i]);
             // replace with average
             readings[i] = averageValue;
         }
     }
     averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
     MQTTpublishValue("soil1/moisture_method3_average", averageValue);
+    MQTTpublishValue("soil1/sensor_method3_average", averageValue);
 
 #define READINGS_WINDOW 10
 
@@ -266,24 +279,29 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     }
     unsigned int movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageCount, true);
     MQTTpublishValue("soil1/moisture_method4_moving_average", movingAverageValue);
+    MQTTpublishValue("soil1/sensor_method4_moving_average", movingAverageValue);
 
-    // method 5 - a moving average of the last 10 readings, but with floating point values for higher accuracy
-    static float movingAverageReadingsFloat[READINGS_WINDOW];
+    // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
+    #define READINGS_FLOAT_WINDOW 20
+
+    static float movingAverageReadingsFloat[READINGS_FLOAT_WINDOW];
     static unsigned int movingAverageCountFloat = 0;
-    if (movingAverageCountFloat < READINGS_WINDOW) {
+    if (movingAverageCountFloat < READINGS_FLOAT_WINDOW) {
         movingAverageReadingsFloat[movingAverageCountFloat++] = static_cast<float>(averageValue);
     } else {
         // shift the readings to the left
-        for (unsigned int i = 0; i < READINGS_WINDOW - 1; i++) {
+        for (unsigned int i = 0; i < READINGS_FLOAT_WINDOW - 1; i++) {
             movingAverageReadingsFloat[i] = movingAverageReadingsFloat[i + 1];
         }
-        movingAverageReadingsFloat[READINGS_WINDOW - 1] = static_cast<float>(averageValue);
+        movingAverageReadingsFloat[READINGS_FLOAT_WINDOW - 1] = static_cast<float>(averageValue);
     }
     // float movingAverageValueFloat = getAverageOfReadingsFloat(movingAverageReadingsFloat, movingAverageCountFloat);
     float movingAverageValueFloat = getAverageOfReadingsFloat(movingAverageReadingsFloat, movingAverageCountFloat);
     // Limit to 1 decimal place
     movingAverageValueFloat = roundf(movingAverageValueFloat * 10.0f) / 10.0f;
     MQTTpublishValue("soil1/moisture_method5_moving_average_float", movingAverageValueFloat);
+    MQTTpublishValue("soil1/sensor_method5_moving_average_float", movingAverageValueFloat);
+
 
     return averageValue;
 }
@@ -354,6 +372,13 @@ float getAverageOfReadingsFloat(const unsigned int readings[], unsigned int numR
 }
 
 // Returns the average as a floating point value for higher accuracy (float version)
+/**
+ * Calculates the average value of an array of floating point numbers.
+ *
+ * @param readings An array of float values representing sensor readings.
+ * @param numReadings The number of readings in the array.
+ * @return The average value of the sensor readings as a float, or 0.0f if numReadings is 0.
+ */
 float getAverageOfReadingsFloat(const float readings[], unsigned int numReadings) {
     if (numReadings == 0) {
         return 0.0f;
