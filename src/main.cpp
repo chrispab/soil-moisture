@@ -38,12 +38,40 @@ PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
 unsigned int readAndTxMoistureSensor();
 void readAndPublishSingleRaw(const char *topic);
 unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetweenReadings);
-void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[256]);
+// void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[256]);
 void method_averageRaw(const char *topic, unsigned int readings[], unsigned int numReadings);
 unsigned int getModeValue(unsigned int a[], unsigned int n);
 unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int numReadings, bool round);
 float getAverageOfReadingsFloat(const unsigned int readings[], unsigned int numReadings);
 float getAverageOfReadingsFloat(const float readings[], unsigned int numReadings);
+/**
+ * Reads a specified number of analog sensor readings with a specified time interval between each reading.
+ *
+ * @param numReadings Reference to an unsigned integer that holds the number of readings to take. Limited to a maximum of 256.
+ * @param msBetweenReadings The time interval between each reading in milliseconds.
+ * @param readings An array of unsigned integers that will hold the readings. The array must have a size of at least `numReadings` (does not need to be `MAX_READINGS`).
+ *
+ * @throws None
+ */
+void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int *readings) {
+    if (numReadings > MAX_READINGS) numReadings = MAX_READINGS;
+    if (numReadings == 0) numReadings = 1;
+
+    // Discard the first reading to stabilize the ADC (common practice for more reliable sensor data)
+    // delay(msBetweenReadings);
+    analogRead(SENSOR_PIN);
+
+    // read in the samples
+    for (unsigned int i = 0; i < numReadings; i++) {
+        delay(msBetweenReadings);
+        readings[i] = analogRead(SENSOR_PIN);
+    }
+    // return readings;  // return the readings array
+    // Note: The readings array is passed by reference, so the values are updated in the caller's context.
+    // The function does not return a value, but the readings are stored in the provided array.
+    // If you want to return the readings array, you can change the function signature to return `unsigned int*` and return `readings`.
+    // return readings;  // This line is not needed since readings is passed by reference
+}
 
 void setup() {
     Serial.begin(115200);
@@ -229,7 +257,7 @@ void publishValueToTopic(const char *topic, uint16_t value) {
 unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetweenReadings) {
     // limit readings to max of MAX_READINGS samples
     unsigned int readings[MAX_READINGS];
-    getReadings(numReadings, msBetweenReadings, readings);
+    readSensorBatch(numReadings, msBetweenReadings, readings);
 
     // method 0 - just read raw
     uint16_t rawValue = readRaw();
@@ -253,8 +281,8 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     // remove outliers
     for (unsigned int i = 0; i < numReadings; i++) {
         if (abs((int)readings[i] - (int)averageValue) > OUTLIER_LIMIT) {  // outlier
-            MQTTpublishValue("soil1/moisture_method3_excluded", readings[i]);
-            MQTTpublishValue("soil1/sensor_method3_excluded", readings[i]);
+            MQTTpublishValue("soil1/moisture_method3_outlier", readings[i]);
+            MQTTpublishValue("soil1/sensor_method3_outlier", readings[i]);
             // replace with average
             readings[i] = averageValue;
         }
@@ -282,7 +310,7 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     MQTTpublishValue("soil1/sensor_method4_moving_average", movingAverageValue);
 
 // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
-#define READINGS_FLOAT_WINDOW 20
+#define READINGS_FLOAT_WINDOW 10
 
     static float movingAverageReadingsFloat[READINGS_FLOAT_WINDOW];
     static unsigned int movingAverageCountFloat = 0;
@@ -303,30 +331,6 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     MQTTpublishValue("soil1/sensor_method5_moving_average_float", movingAverageValueFloat);
 
     return averageValue;
-}
-
-/**
- * Reads a specified number of analog sensor readings with a specified time interval between each reading.
- *
- * @param numReadings Reference to an unsigned integer that holds the number of readings to take. Limited to a maximum of 256.
- * @param msBetweenReadings The time interval between each reading in milliseconds.
- * @param readings An array of unsigned integers that will hold the readings. The array must have a size of at least `numReadings` (does not need to be `MAX_READINGS`).
- *
- * @throws None
- */
-void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[]) {
-    if (numReadings > MAX_READINGS) numReadings = MAX_READINGS;
-    if (numReadings == 0) numReadings = 1;
-
-    // Discard the first reading to stabilize the ADC (common practice for more reliable sensor data)
-    // delay(msBetweenReadings);
-    analogRead(SENSOR_PIN);
-
-    // read in the samples
-    for (unsigned int i = 0; i < numReadings; i++) {
-        delay(msBetweenReadings);
-        readings[i] = analogRead(SENSOR_PIN);
-    }
 }
 
 /**
