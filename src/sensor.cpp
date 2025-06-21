@@ -1,6 +1,11 @@
-#include <Arduino.h>
 #include "sensor.h"
+
+#include <Arduino.h>
+
 #include "config.h"
+#include <PubSubClient.h>
+extern PubSubClient MQTTclient;
+#
 /**
  * Reads a specified number of analog sensor readings with a specified time interval between each reading.
  *
@@ -13,6 +18,9 @@
  * @throws None
  */
 void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int *readings) {
+    MQTTclient.publish("soil1/status", "reading sensor batch");
+    // readSensorBatch(numReadings, msBetweenReadings, readings);
+
     if (numReadings > MAX_READINGS) numReadings = MAX_READINGS;
     if (numReadings == 0) numReadings = 1;
 
@@ -30,4 +38,6 @@ void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, 
     // The function does not return a value, but the readings are stored in the provided array.
     // If you want to return the readings array, you can change the function signature to return `unsigned int*` and return `readings`.
     // return readings;  // This line is not needed since readings is passed by reference
+
+    MQTTclient.publish("soil1/status", "reading sensor batch complete");
 }

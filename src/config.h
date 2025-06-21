@@ -1,6 +1,6 @@
 #ifndef __SETTINGS_H
 #define __SETTINGS_H
-#define VERSION "V1.41"
+#define VERSION "V1.43"
 
 // #define DEBUG_WSERIAL
 
@@ -19,9 +19,19 @@
 #define MQTT_CLIENT_NAME "Soil1MQTTClientALT"
 #define LWT_TOPIC "Soil1ALT/LWT"
 #else
+#define MQTT_TOPIC_PREFIX "soil1/"
 #define MQTT_CLIENT_NAME "Soil1MQTTClient"
-#define LWT_TOPIC "soil1/LWT"
+#define LWT_TOPIC "LWT"
 #endif
+
+#define SENSOR_METHOD0_SINGLE_RAW_TOPIC "soil1/sensor_method0_single_raw"
+#define SENSOR_METHOD1_BATCH_AVERAGE_TOPIC "soil1/sensor_method1_batch_average"
+#define SENSOR_METHOD2_BATCH_MODE_TOPIC "soil1/sensor_method2_batch_mode"
+#define SENSOR_METHOD3_BATCH_OUTLIER_TOPIC "soil1/sensor_method3_batch_outlier"
+#define SENSOR_METHOD3_BATCH_AVERAGE_TOPIC "soil1/sensor_method3_batch_average"
+#define SENSOR_METHOD4_BATCH_MOVING_AVERAGE_TOPIC "soil1/sensor_method4_batch_moving_average"
+#define SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC "soil1/sensor_method5_batch_moving_average_float"
+
 
 #define ESP32_WATCHDOG_TIMEOUT_SECS 60
 #define ESP32_WATCHDOG_RESET_INTERVAL_SECS 30
