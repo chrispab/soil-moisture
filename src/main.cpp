@@ -41,7 +41,9 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
 void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[256]);
 void method_averageRaw(const char *topic, unsigned int readings[], unsigned int numReadings);
 unsigned int getModeValue(unsigned int a[], unsigned int n);
-unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int numReadings);
+unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int numReadings, bool round);
+float getAverageOfReadingsFloat(const unsigned int readings[], unsigned int numReadings);
+float getAverageOfReadingsFloat(const float readings[], unsigned int numReadings);
 
 void setup() {
     Serial.begin(115200);
@@ -139,7 +141,7 @@ unsigned int readAndTxMoistureSensor() {
 
     moisture_raw = 0;
     if (now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL_MS) {
-        runningSensorReading = (runningSensorReading + analogRead(SENSOR_PIN))/2;
+        runningSensorReading = (runningSensorReading + analogRead(SENSOR_PIN)) / 2;
         // runningSensorReading = (((runningSensorReading * 80) / 100) + ((analogRead(SENSOR_PIN) * 20) / 100));
         lastMoistureSampleMs = now;
     }
@@ -197,9 +199,8 @@ uint16_t readRaw() {
     return analogRead(SENSOR_PIN);
 }
 
-
-//Publish a value to the given topic
-void publishValueToTopic(const char* topic, uint16_t value) {
+// Publish a value to the given topic
+void publishValueToTopic(const char *topic, uint16_t value) {
     MQTTpublishValue(topic, value);
 }
 
@@ -224,7 +225,7 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     unsigned int readings[MAX_READINGS];
     getReadings(numReadings, msBetweenReadings, readings);
 
-    //method 0 - just read raw
+    // method 0 - just read raw
     publishValueToTopic("soil1/moisture_raw", readRaw());
 
     readAndPublishSingleRaw("soil1/moisture_method0_single");
@@ -237,7 +238,7 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     MQTTpublishValue("soil1/moisture_method2_mode", modeValue);
 
     // method 3 - remove outliers, then average
-    unsigned int averageValue = getAverageOfReadings(readings, numReadings);
+    unsigned int averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
     // remove outliers
     for (unsigned int i = 0; i < numReadings; i++) {
         if (abs((int)readings[i] - (int)averageValue) > OUTLIER_LIMIT) {  // outlier
@@ -246,11 +247,10 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
             readings[i] = averageValue;
         }
     }
-    averageValue = getAverageOfReadings(readings, numReadings);
+    averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
     MQTTpublishValue("soil1/moisture_method3_average", averageValue);
 
-
-    #define READINGS_WINDOW 10
+#define READINGS_WINDOW 10
 
     // method 4 - a moving average of the last 10 readings
     static unsigned int movingAverageReadings[READINGS_WINDOW];
@@ -264,9 +264,26 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
         }
         movingAverageReadings[READINGS_WINDOW - 1] = averageValue;
     }
-    unsigned int movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageCount);
+    unsigned int movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageCount, true);
     MQTTpublishValue("soil1/moisture_method4_moving_average", movingAverageValue);
 
+    // method 5 - a moving average of the last 10 readings, but with floating point values for higher accuracy
+    static float movingAverageReadingsFloat[READINGS_WINDOW];
+    static unsigned int movingAverageCountFloat = 0;
+    if (movingAverageCountFloat < READINGS_WINDOW) {
+        movingAverageReadingsFloat[movingAverageCountFloat++] = static_cast<float>(averageValue);
+    } else {
+        // shift the readings to the left
+        for (unsigned int i = 0; i < READINGS_WINDOW - 1; i++) {
+            movingAverageReadingsFloat[i] = movingAverageReadingsFloat[i + 1];
+        }
+        movingAverageReadingsFloat[READINGS_WINDOW - 1] = static_cast<float>(averageValue);
+    }
+    // float movingAverageValueFloat = getAverageOfReadingsFloat(movingAverageReadingsFloat, movingAverageCountFloat);
+    float movingAverageValueFloat = getAverageOfReadingsFloat(movingAverageReadingsFloat, movingAverageCountFloat);
+    // Limit to 1 decimal place
+    movingAverageValueFloat = roundf(movingAverageValueFloat * 10.0f) / 10.0f;
+    MQTTpublishValue("soil1/moisture_method5_moving_average_float", movingAverageValueFloat);
 
     return averageValue;
 }
@@ -295,29 +312,59 @@ void getReadings(unsigned int &numReadings, unsigned int msBetweenReadings, unsi
     }
 }
 
-
 /**
  * Calculates the average value of an array of unsigned integers.
  *
- * Integer division is used, so the result is truncated (not rounded).
+ * By default, integer division is used, so the result is truncated toward zero (not rounded).
+ * This may lead to loss of precision for small sample sizes or when the sum is not divisible by numReadings.
+ * If higher accuracy is needed, set the 'round' parameter to true to return the nearest integer (rounded).
  *
  * @param readings An array of unsigned integers representing sensor readings.
  * @param numReadings The number of readings in the array.
+ * @param round If true, the result will be rounded to the nearest integer. Default is false (truncate).
  * @return The average value of the sensor readings, or 0 if numReadings is 0.
  */
-unsigned int getAverageOfReadings(const unsigned int* readings, unsigned int numReadings) {
+unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int numReadings, bool round = false) {
     if (numReadings == 0) {
         return 0;
     }
-    unsigned long valuesTotal = 0;
+
+    uint64_t valuesTotal = 0;
     for (unsigned int i = 0; i < numReadings; i++) {
         valuesTotal += readings[i];
     }
-    // Integer division is used here; the result will be truncated to an integer.
-    return valuesTotal / numReadings;
+    if (round) {
+        return (valuesTotal + numReadings / 2) / numReadings;
+    } else {
+        return valuesTotal / numReadings;
+    }
 }
 
+// Returns the average as a floating point value for higher accuracy (unsigned int version)
+float getAverageOfReadingsFloat(const unsigned int readings[], unsigned int numReadings) {
+    if (numReadings == 0) {
+        return 0.0f;
+    }
 
+    uint64_t valuesTotal = 0;
+    for (unsigned int i = 0; i < numReadings; i++) {
+        valuesTotal += readings[i];
+    }
+    return static_cast<float>(valuesTotal) / static_cast<float>(numReadings);
+}
+
+// Returns the average as a floating point value for higher accuracy (float version)
+float getAverageOfReadingsFloat(const float readings[], unsigned int numReadings) {
+    if (numReadings == 0) {
+        return 0.0f;
+    }
+
+    float valuesTotal = 0.0f;
+    for (unsigned int i = 0; i < numReadings; i++) {
+        valuesTotal += readings[i];
+    }
+    return valuesTotal / static_cast<float>(numReadings);
+}
 
 /**
  * Calculates the average value of an array of unsigned integers.
