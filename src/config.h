@@ -1,7 +1,15 @@
 #ifndef __SETTINGS_H
 #define __SETTINGS_H
+#define VERSION "V1.41"
 
 // #define DEBUG_WSERIAL
+
+
+
+#define MAX_READINGS 256
+#define MQTT_TELE_PERIOD_MS (60 * 1000)  // MS DELAY BETWEEN
+#define RUNNING_SAMPLE_INTERVAL_MS (20 * 1000)
+
 
 #define RELEASE
 

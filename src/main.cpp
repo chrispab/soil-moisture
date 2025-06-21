@@ -11,7 +11,11 @@
 #include "LedFader.h"
 #include "MQTTLib.h"
 #include "WiFiLib.h"
+
 #include "config.h"
+#include "sensor.h"
+#include "mqtt.h"
+
 #include "version.h"
 
 #define GREEN_LED_PIN GPIO_NUM_12  //
@@ -24,7 +28,6 @@
 
 // Outlier limit for sensor readings
 #define OUTLIER_LIMIT 4
-#define MAX_READINGS 256
 
 LedFader heartBeatLED(GREEN_LED_PIN, 1, 0, 255, HEART_BEAT_TIME);
 LedFader blueBeatLED(ONBOARD_LED_PIN, 2, 0, 50, BLUE_BEAT_TIME);
@@ -33,51 +36,21 @@ IPAddress mqttBroker(192, 168, 0, MQTT_LAST_OCTET);
 WiFiClient myWiFiClient;
 
 // forward func declarations
-void callback(char *topic, byte *payload, unsigned int length);
+// void callback(char *topic, byte *payload, unsigned int length);
 PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
-unsigned int readAndTxMoistureSensor();
+unsigned int readAndTxSensorIfDue();
 void readAndPublishSingleRaw(const char *topic);
 unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetweenReadings);
-// void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int readings[256]);
 void method_averageRaw(const char *topic, unsigned int readings[], unsigned int numReadings);
 unsigned int getModeValue(unsigned int a[], unsigned int n);
 unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int numReadings, bool round);
 float getAverageOfReadingsFloat(const unsigned int readings[], unsigned int numReadings);
 float getAverageOfReadingsFloat(const float readings[], unsigned int numReadings);
-/**
- * Reads a specified number of analog sensor readings with a specified time interval between each reading.
- *
- * @param numReadings Reference to an unsigned integer that holds the number of readings to take. Limited to a maximum of 256.
- * @param msBetweenReadings The time interval between each reading in milliseconds.
- * @param readings An array of unsigned integers that will hold the readings. The array must have a size of at least `numReadings` (does not need to be `MAX_READINGS`).
- *
- * @throws None
- */
-void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int *readings) {
-    if (numReadings > MAX_READINGS) numReadings = MAX_READINGS;
-    if (numReadings == 0) numReadings = 1;
-
-    // Discard the first reading to stabilize the ADC (common practice for more reliable sensor data)
-    // delay(msBetweenReadings);
-    analogRead(SENSOR_PIN);
-
-    // read in the samples
-    for (unsigned int i = 0; i < numReadings; i++) {
-        delay(msBetweenReadings);
-        readings[i] = analogRead(SENSOR_PIN);
-    }
-    // return readings;  // return the readings array
-    // Note: The readings array is passed by reference, so the values are updated in the caller's context.
-    // The function does not return a value, but the readings are stored in the provided array.
-    // If you want to return the readings array, you can change the function signature to return `unsigned int*` and return `readings`.
-    // return readings;  // This line is not needed since readings is passed by reference
-}
 
 void setup() {
     Serial.begin(115200);
     while (!Serial)  // Wait for the serial connection to be establised.
         delay(50);
-    // delay(3000);
 
     Serial.println("Hi from soil1 ... Booting");
     connectWiFi();
@@ -87,7 +60,6 @@ void setup() {
     Serial.flush();
 
     delay(5000);
-    // connectMQTT();
     reconnectMQTT();
 
     heartBeatLED.begin();  // initialize
@@ -148,31 +120,25 @@ void loop() {
     heartBeatLED.update();
     blueBeatLED.update();
 
-    // readAndPublishSingleRaw("soil/calibration");
-    // readAndPublishSingleRaw("soil1/moisture2_average_raw");
-    // delay(1000);
-    readAndTxMoistureSensor();
+    readAndTxSensorIfDue();
 }
 
-#define MQTT_TELE_PERIOD_MS (60 * 1000)  // MS DELAY BETWEEN
 unsigned int lastMQTTTransmitMs = millis() - MQTT_TELE_PERIOD_MS - 1000;
 float prevFilteredValue = 0.0;
-#define RUNNING_SAMPLE_INTERVAL_MS (20 * 1000)
 unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000;
 unsigned int runningSensorReading = analogRead(SENSOR_PIN);  // running total reading - taken every RUNNING_SAMPLE_INTERVAL_MS
 float scaleAndTransmit(unsigned int moistureReading, float drySensorMaxRaw, float wetSensorMinRaw, const char *topic);
 
-unsigned int readAndTxMoistureSensor() {
+unsigned int readAndTxSensorIfDue() {
     unsigned int now = millis();
-    // unsigned int sensorValue;
-    unsigned int moisture_raw;
+    unsigned int sensor_raw;
 
-    moisture_raw = 0;
-    if (now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL_MS) {
-        runningSensorReading = (runningSensorReading + analogRead(SENSOR_PIN)) / 2;
-        // runningSensorReading = (((runningSensorReading * 80) / 100) + ((analogRead(SENSOR_PIN) * 20) / 100));
-        lastMoistureSampleMs = now;
-    }
+    sensor_raw = 0;
+    // if (now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL_MS) {
+    //     runningSensorReading = (runningSensorReading + analogRead(SENSOR_PIN)) / 2;
+    //     // runningSensorReading = (((runningSensorReading * 80) / 100) + ((analogRead(SENSOR_PIN) * 20) / 100));
+    //     lastMoistureSampleMs = now;
+    // }
     if (now - lastMQTTTransmitMs > MQTT_TELE_PERIOD_MS) {
         lastMQTTTransmitMs = now;
 
@@ -181,12 +147,13 @@ unsigned int readAndTxMoistureSensor() {
 
         // do all the different methods
         unsigned int numReadings = 255;
-        moisture_raw = readMethodsPublish(numReadings, 50);
-        Serial.println(moisture_raw);
+        unsigned int msBetweenReadings = 50;
+        sensor_raw = readMethodsPublish(numReadings, msBetweenReadings);
+        Serial.println(sensor_raw);
 
-        scaleAndTransmit(moisture_raw, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW, "soil1/moisture_pc");
+        scaleAndTransmit(sensor_raw, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW, "soil1/moisture_pc");
     }
-    return moisture_raw;
+    return sensor_raw;
 }
 
 /**
@@ -443,38 +410,7 @@ unsigned int getModeValue(unsigned int a[], unsigned int n) {
 
     return maxValue;
 }
-// MQTT stuff
 
-/**
- * Callback function for handling MQTT message arrival.
- *
- * @param topic The topic of the MQTT message.
- * @param payload The payload of the MQTT message.
- * @param length The length of the payload.
- *
- * @throws None
- */
-void callback(char *topic, byte *payload, unsigned int length) {
-    // handle message arrived
-    // format and display the whole MQTT message and payload
-    char fullMQTTmessage[255];  // = "MQTT rxed thisisthetopicforthismesage and
-                                // finally the payload, and a bit extra to make
-                                // sure there is room in the string and even
-                                // more chars";
-    strcpy(fullMQTTmessage, "MQTT Rxed Topic: [");
-    strcat(fullMQTTmessage, topic);
-    strcat(fullMQTTmessage, "], ");
-    // append payload and add \o terminator
-    strcat(fullMQTTmessage, "Payload: [");
-    strncat(fullMQTTmessage, (char *)payload, length);
-    strcat(fullMQTTmessage, "]");
-
-    Serial.println(fullMQTTmessage);
-
-    readAndPublishSingleRaw("soil1/moisture_raw");
-    // unsigned int numReadings = 32;
-    // readMethodsPublish(numReadings, 200U);
-}
 
 unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max) {
     if (reading > max) {
