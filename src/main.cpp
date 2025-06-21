@@ -232,12 +232,12 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     uint16_t rawValue = readRaw();
     Serial.print("Raw sensor value: ");
     Serial.println(rawValue);
-    publishValueToTopic("soil1/moisture_raw", rawValue);
+    // publishValueToTopic("soil1/moisture_raw", rawValue);
     publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
     // readAndPublishSingleRaw("soil1/sensor_method0_single_raw");
 
     // method 1
-    method_averageRaw("soil1/moisture_method1_average", readings, numReadings);
+    // method_averageRaw("soil1/moisture_method1_average", readings, numReadings);
     method_averageRaw(SENSOR_METHOD1_BATCH_AVERAGE_TOPIC, readings, numReadings);
 
     // method 2 - find most common value
@@ -249,14 +249,14 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     // remove outliers
     for (unsigned int i = 0; i < numReadings; i++) {
         if (abs((int)readings[i] - (int)averageValue) > OUTLIER_LIMIT) {  // outlier
-            MQTTpublishValue("soil1/moisture_method3_outlier", readings[i]);
+            // MQTTpublishValue("soil1/moisture_method3_outlier", readings[i]);
             MQTTpublishValue(SENSOR_METHOD3_BATCH_OUTLIER_TOPIC, readings[i]);
             // replace with average
             readings[i] = averageValue;
         }
     }
     averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
-    MQTTpublishValue("soil1/moisture_method3_average", averageValue);
+    // MQTTpublishValue("soil1/moisture_method3_average", averageValue);
     MQTTpublishValue(SENSOR_METHOD3_BATCH_AVERAGE_TOPIC, averageValue);
 
 // method 4 - a moving average of the last 10 readings
@@ -274,7 +274,7 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
         movingAverageReadings[MOVING_AVERAGE_READINGS_WINDOW - 1] = averageValue;
     }
     unsigned int movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageCount, true);
-    MQTTpublishValue("soil1/moisture_method4_moving_average", movingAverageValue);
+    // MQTTpublishValue("soil1/moisture_method4_moving_average", movingAverageValue);
     MQTTpublishValue(SENSOR_METHOD4_BATCH_MOVING_AVERAGE_TOPIC, movingAverageValue);
 
 // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
@@ -295,7 +295,7 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     float movingAverageValueFloat = getAverageOfReadingsFloat(movingAverageReadingsFloat, movingAverageCountFloat);
     // Limit to 1 decimal place
     movingAverageValueFloat = roundf(movingAverageValueFloat * 10.0f) / 10.0f;
-    MQTTpublishValue("soil1/moisture_method5_moving_average_float", movingAverageValueFloat);
+    // MQTTpublishValue("soil1/moisture_method5_moving_average_float", movingAverageValueFloat);
     MQTTpublishValue(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValueFloat);
     // MQTTclient.publish(, movingAverageValueFloat);
 

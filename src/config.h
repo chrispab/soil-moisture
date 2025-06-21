@@ -1,6 +1,7 @@
 #ifndef __SETTINGS_H
 #define __SETTINGS_H
-#define VERSION "V1.43"
+
+#define VERSION "V1.44"
 
 // #define DEBUG_WSERIAL
 
