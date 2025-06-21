@@ -260,36 +260,36 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     MQTTpublishValue(SENSOR_METHOD3_BATCH_AVERAGE_TOPIC, averageValue);
 
 // method 4 - a moving average of the last 10 readings
-#define READINGS_WINDOW 10
+#define MOVING_AVERAGE_READINGS_WINDOW 10
 
-    static unsigned int movingAverageReadings[READINGS_WINDOW];
+    static unsigned int movingAverageReadings[MOVING_AVERAGE_READINGS_WINDOW];
     static unsigned int movingAverageCount = 0;
-    if (movingAverageCount < READINGS_WINDOW) {
+    if (movingAverageCount < MOVING_AVERAGE_READINGS_WINDOW) {
         movingAverageReadings[movingAverageCount++] = averageValue;
     } else {
         // shift the readings to the left
-        for (unsigned int i = 0; i < READINGS_WINDOW - 1; i++) {
+        for (unsigned int i = 0; i < MOVING_AVERAGE_READINGS_WINDOW - 1; i++) {
             movingAverageReadings[i] = movingAverageReadings[i + 1];
         }
-        movingAverageReadings[READINGS_WINDOW - 1] = averageValue;
+        movingAverageReadings[MOVING_AVERAGE_READINGS_WINDOW - 1] = averageValue;
     }
     unsigned int movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageCount, true);
     MQTTpublishValue("soil1/moisture_method4_moving_average", movingAverageValue);
     MQTTpublishValue(SENSOR_METHOD4_BATCH_MOVING_AVERAGE_TOPIC, movingAverageValue);
 
 // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
-#define READINGS_FLOAT_WINDOW 10
+#define MOVING_AVERAGE_FLOAT_READINGS_WINDOW 10
 
-    static float movingAverageReadingsFloat[READINGS_FLOAT_WINDOW];
+    static float movingAverageReadingsFloat[MOVING_AVERAGE_FLOAT_READINGS_WINDOW];
     static unsigned int movingAverageCountFloat = 0;
-    if (movingAverageCountFloat < READINGS_FLOAT_WINDOW) {
+    if (movingAverageCountFloat < MOVING_AVERAGE_FLOAT_READINGS_WINDOW) {
         movingAverageReadingsFloat[movingAverageCountFloat++] = static_cast<float>(averageValue);
     } else {
         // shift the readings to the left
-        for (unsigned int i = 0; i < READINGS_FLOAT_WINDOW - 1; i++) {
+        for (unsigned int i = 0; i < MOVING_AVERAGE_FLOAT_READINGS_WINDOW - 1; i++) {
             movingAverageReadingsFloat[i] = movingAverageReadingsFloat[i + 1];
         }
-        movingAverageReadingsFloat[READINGS_FLOAT_WINDOW - 1] = static_cast<float>(averageValue);
+        movingAverageReadingsFloat[MOVING_AVERAGE_FLOAT_READINGS_WINDOW - 1] = static_cast<float>(averageValue);
     }
     // float movingAverageValueFloat = getAverageOfReadingsFloat(movingAverageReadingsFloat, movingAverageCountFloat);
     float movingAverageValueFloat = getAverageOfReadingsFloat(movingAverageReadingsFloat, movingAverageCountFloat);
