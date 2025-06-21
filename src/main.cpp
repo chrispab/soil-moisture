@@ -248,6 +248,26 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     }
     averageValue = getAverageOfReadings(readings, numReadings);
     MQTTpublishValue("soil1/moisture_method3_average", averageValue);
+
+
+    #define READINGS_WINDOW 10
+
+    // method 4 - a moving average of the last 10 readings
+    static unsigned int movingAverageReadings[READINGS_WINDOW];
+    static unsigned int movingAverageCount = 0;
+    if (movingAverageCount < READINGS_WINDOW) {
+        movingAverageReadings[movingAverageCount++] = averageValue;
+    } else {
+        // shift the readings to the left
+        for (unsigned int i = 0; i < READINGS_WINDOW - 1; i++) {
+            movingAverageReadings[i] = movingAverageReadings[i + 1];
+        }
+        movingAverageReadings[READINGS_WINDOW - 1] = averageValue;
+    }
+    unsigned int movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageCount);
+    MQTTpublishValue("soil1/moisture_method4_moving_average", movingAverageValue);
+
+
     return averageValue;
 }
 
