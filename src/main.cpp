@@ -244,20 +244,19 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     unsigned int modeValue = getModeValue(readings, numReadings);
     MQTTpublishValue(SENSOR_METHOD2_BATCH_MODE_TOPIC, modeValue);
 
+
     // method 3 - remove outliers, then average
     unsigned int averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
-    // remove outliers
     for (unsigned int i = 0; i < numReadings; i++) {
         if (abs((int)readings[i] - (int)averageValue) > OUTLIER_LIMIT) {  // outlier
-            // MQTTpublishValue("soil1/moisture_method3_outlier", readings[i]);
-            MQTTpublishValue(SENSOR_METHOD3_BATCH_OUTLIER_TOPIC, readings[i]);
+            // MQTTpublishValue(SENSOR_METHOD3_BATCH_OUTLIER_TOPIC, readings[i]);
             // replace with average
             readings[i] = averageValue;
         }
     }
     averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
-    // MQTTpublishValue("soil1/moisture_method3_average", averageValue);
     MQTTpublishValue(SENSOR_METHOD3_BATCH_AVERAGE_TOPIC, averageValue);
+
 
 // method 4 - a moving average of the last 10 readings
 #define MOVING_AVERAGE_READINGS_WINDOW 10

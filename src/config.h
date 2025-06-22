@@ -1,7 +1,7 @@
 #ifndef __SETTINGS_H
 #define __SETTINGS_H
 
-#define VERSION "V1.44"
+#define VERSION "V1.45 lwt"
 
 // #define DEBUG_WSERIAL
 
@@ -22,7 +22,7 @@
 #else
 #define MQTT_TOPIC_PREFIX "soil1/"
 #define MQTT_CLIENT_NAME "Soil1MQTTClient"
-#define LWT_TOPIC "LWT"
+#define LWT_TOPIC "soil1/LWT"
 #endif
 
 #define SENSOR_METHOD0_SINGLE_RAW_TOPIC "soil1/sensor_method0_single_raw"
