@@ -162,7 +162,7 @@ unsigned int readAndTxSensorIfDue() {
         // turn on sensor POWER
         pinMode(SENSOR_POWERSUPPLY_PIN, OUTPUT);
         digitalWrite(SENSOR_POWERSUPPLY_PIN, HIGH);
-        delay(200);
+        delay(100);
 
         // read sensor
         uint16_t rawValue = analogRead(SENSOR_PIN);
