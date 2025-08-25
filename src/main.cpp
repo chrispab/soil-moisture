@@ -11,11 +11,9 @@
 #include "LedFader.h"
 #include "MQTTLib.h"
 #include "WiFiLib.h"
-
 #include "config.h"
-#include "sensor.h"
 #include "mqtt.h"
-
+#include "sensor.h"
 #include "version.h"
 
 #define GREEN_LED_PIN GPIO_NUM_12  //
@@ -46,6 +44,7 @@ unsigned int getModeValue(unsigned int a[], unsigned int n);
 unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int numReadings, bool round);
 float getAverageOfReadingsFloat(const unsigned int readings[], unsigned int numReadings);
 float getAverageOfReadingsFloat(const float readings[], unsigned int numReadings);
+void publishValueToTopic(const char *topic, uint16_t value);
 
 void setup() {
     Serial.begin(115200);
@@ -129,29 +128,51 @@ unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000
 unsigned int runningSensorReading = analogRead(SENSOR_PIN);  // running total reading - taken every RUNNING_SAMPLE_INTERVAL_MS
 float scaleAndTransmit(unsigned int moistureReading, float drySensorMaxRaw, float wetSensorMinRaw, const char *topic);
 
+/**
+ * @brief Reads the soil moisture sensor and transmits the data over MQTT if the telemetry period has passed.
+ *
+ * This function checks if the time since the last MQTT transmission is greater than the configured telemetry period (MQTT_TELE_PERIOD_MS).
+ * If it is, the function will:
+ * 1. Publish the current firmware version.
+ * 2. Call `readMethodsPublish()` to perform a series of sensor readings and publish various interpretations of the data (e.g., raw, average, mode).
+ * 3. Print the final raw sensor value to the serial console.
+ *
+ * The function uses a non-blocking approach by checking the elapsed time with `millis()`.
+ *
+ * @note This function contains commented-out code that suggests alternative implementations,
+ *       such as calculating a running sensor reading or scaling and transmitting a percentage value.
+ *
+ * @return unsigned int The last raw sensor reading, or 0 if no reading was performed in the current call.
+ */
 unsigned int readAndTxSensorIfDue() {
     unsigned int now = millis();
     unsigned int sensor_raw;
 
     sensor_raw = 0;
-    // if (now - lastMoistureSampleMs > RUNNING_SAMPLE_INTERVAL_MS) {
-    //     runningSensorReading = (runningSensorReading + analogRead(SENSOR_PIN)) / 2;
-    //     // runningSensorReading = (((runningSensorReading * 80) / 100) + ((analogRead(SENSOR_PIN) * 20) / 100));
-    //     lastMoistureSampleMs = now;
-    // }
+
     if (now - lastMQTTTransmitMs > MQTT_TELE_PERIOD_MS) {
         lastMQTTTransmitMs = now;
 
         // publish telemetry
         MQTTclient.publish("soil1/version", VERSION);
 
-        // do all the different methods
-        unsigned int numReadings = 255;
-        unsigned int msBetweenReadings = 50;
-        sensor_raw = readMethodsPublish(numReadings, msBetweenReadings);
-        Serial.println(sensor_raw);
+        // turn on sensor POWER
+        pinMode(SENSOR_POWERSUPPLY_PIN, OUTPUT);
+        digitalWrite(SENSOR_POWERSUPPLY_PIN, HIGH);
+        delay(200);
 
-        // scaleAndTransmit(sensor_raw, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW, "soil1/moisture_pc");
+        // read sensor
+        uint16_t rawValue = analogRead(SENSOR_PIN);
+        Serial.print("Raw sensor value: ");
+        Serial.println(rawValue);
+        // publishValueToTopic("soil1/moisture_raw", rawValue);
+        publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
+        sensor_raw = rawValue;
+
+        // turn off sensor power
+        digitalWrite(SENSOR_POWERSUPPLY_PIN, LOW);
+        pinMode(SENSOR_POWERSUPPLY_PIN, INPUT);
+
     }
     return sensor_raw;
 }
@@ -244,7 +265,6 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     unsigned int modeValue = getModeValue(readings, numReadings);
     MQTTpublishValue(SENSOR_METHOD2_BATCH_MODE_TOPIC, modeValue);
 
-
     // method 3 - remove outliers, then average
     unsigned int averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
     for (unsigned int i = 0; i < numReadings; i++) {
@@ -256,7 +276,6 @@ unsigned int readMethodsPublish(unsigned int &numReadings, unsigned int msBetwee
     }
     averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
     MQTTpublishValue(SENSOR_METHOD3_BATCH_AVERAGE_TOPIC, averageValue);
-
 
 // method 4 - a moving average of the last 10 readings
 #define MOVING_AVERAGE_READINGS_WINDOW 10
@@ -411,7 +430,6 @@ unsigned int getModeValue(unsigned int a[], unsigned int n) {
 
     return maxValue;
 }
-
 
 unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max) {
     if (reading > max) {

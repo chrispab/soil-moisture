@@ -1,14 +1,14 @@
 #ifndef __SETTINGS_H
 #define __SETTINGS_H
 
-#define VERSION "V1.45 lwt"
+#define VERSION "V1.01 alt-sensor"
 
 // #define DEBUG_WSERIAL
-
+#define SECONDS 5
+#define MQTT_TELE_PERIOD_MS (SECONDS * 1000)  // MS DELAY BETWEEN
 
 
 #define MAX_READINGS 256
-#define MQTT_TELE_PERIOD_MS (60 * 1000)  // MS DELAY BETWEEN
 #define RUNNING_SAMPLE_INTERVAL_MS (20 * 1000)
 
 
@@ -42,6 +42,7 @@
 #define HOST_NAME "soil1.local"
 
 #define SENSOR_PIN GPIO_NUM_36
+#define SENSOR_POWERSUPPLY_PIN GPIO_NUM_23
 
 // float DRY_SENSOR_MAX_RAW = 3950.0f;
 // float WET_SENSOR_MIN_RAW = 1500.0f;
