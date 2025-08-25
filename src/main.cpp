@@ -155,6 +155,9 @@ unsigned int readAndTxSensorIfDue() {
 
         // publish telemetry
         MQTTclient.publish("soil1/version", VERSION);
+        MQTTclient.publish("soil1/MQTT_TELE_PERIOD_MS", String(MQTT_TELE_PERIOD_MS).c_str());
+
+        // read sensor", VERSION);
 
         // turn on sensor POWER
         pinMode(SENSOR_POWERSUPPLY_PIN, OUTPUT);
@@ -163,6 +166,8 @@ unsigned int readAndTxSensorIfDue() {
 
         // read sensor
         uint16_t rawValue = analogRead(SENSOR_PIN);
+        Serial.print(now);
+        Serial.print(": ");
         Serial.print("Raw sensor value: ");
         Serial.println(rawValue);
         // publishValueToTopic("soil1/moisture_raw", rawValue);

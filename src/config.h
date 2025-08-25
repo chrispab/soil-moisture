@@ -4,7 +4,7 @@
 #define VERSION "V1.01 alt-sensor"
 
 // #define DEBUG_WSERIAL
-#define SECONDS 5
+#define SECONDS 60
 #define MQTT_TELE_PERIOD_MS (SECONDS * 1000)  // MS DELAY BETWEEN
 
 
