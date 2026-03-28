@@ -1,12 +1,37 @@
 #ifndef __SETTINGS_H
 #define __SETTINGS_H
 
-#define VERSION "V1.01 alt-sensor"
+#define VERSION "V1.05 MQTT topic mod 2"
+
+// adjust below as required
+#define MOISTURE_SENSOR_LOCATION "Zone 3"
+#define MOISTURE_SENSOR_ID "1"
+// end-adjust
+
+#define MQTT_TOPIC_PREFIX "soil_moisture_sensor_"
+#define MQTT_PRIMARY_TOPIC MQTT_TOPIC_PREFIX MOISTURE_SENSOR_ID "/"
+
+#define MQTT_VERSION_TOPIC MQTT_PRIMARY_TOPIC "version"
+
+#define SENSOR_METHOD0_SINGLE_RAW_TOPIC MQTT_PRIMARY_TOPIC "rawReading"
+#define SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC MQTT_PRIMARY_TOPIC "sensor_method5_batch_moving_average_float"
+
+// #define ALT_ID
+#ifdef ALT_ID
+#define MQTT_CLIENT_NAME "Soil1MQTTClientALT"
+#define LWT_TOPIC "Soil1ALT/LWT"
+#else
+// #define MQTT_TOPIC_PREFIX "soil1/"
+#define MQTT_CLIENT_NAME "Soil1MQTTClient"
+#define LWT_TOPIC "soil_moisture_sensor_1/LWT"
+#endif
 
 // #define DEBUG_WSERIAL
 #define MQTT_TELE_PERIOD_SECONDS 300
 #define MQTT_TELE_PERIOD_MS (MQTT_TELE_PERIOD_SECONDS * 1000)  // MS DELAY BETWEEN
+#define MQTT_TELE_PERIOD_MS_TOPIC MQTT_PRIMARY_TOPIC "tele_period_ms"
 
+#define MOVING_AVERAGE_FLOAT_READINGS_WINDOW 10
 
 #define MAX_READINGS 256
 #define RUNNING_SAMPLE_INTERVAL_MS (20 * 1000)
@@ -14,24 +39,13 @@
 
 #define RELEASE
 
-// #define ALT_ID
 
-#ifdef ALT_ID
-#define MQTT_CLIENT_NAME "Soil1MQTTClientALT"
-#define LWT_TOPIC "Soil1ALT/LWT"
-#else
-#define MQTT_TOPIC_PREFIX "soil1/"
-#define MQTT_CLIENT_NAME "Soil1MQTTClient"
-#define LWT_TOPIC "soil1/LWT"
-#endif
 
-#define SENSOR_METHOD0_SINGLE_RAW_TOPIC "soil1/sensor_method0_single_raw"
 #define SENSOR_METHOD1_BATCH_AVERAGE_TOPIC "soil1/sensor_method1_batch_average"
 #define SENSOR_METHOD2_BATCH_MODE_TOPIC "soil1/sensor_method2_batch_mode"
 #define SENSOR_METHOD3_BATCH_OUTLIER_TOPIC "soil1/sensor_method3_batch_outlier"
 #define SENSOR_METHOD3_BATCH_AVERAGE_TOPIC "soil1/sensor_method3_batch_average"
 #define SENSOR_METHOD4_BATCH_MOVING_AVERAGE_TOPIC "soil1/sensor_method4_batch_moving_average"
-#define SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC "soil1/sensor_method5_batch_moving_average_float"
 
 
 #define ESP32_WATCHDOG_TIMEOUT_SECS 60
