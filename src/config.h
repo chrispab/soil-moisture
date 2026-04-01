@@ -17,14 +17,14 @@
 #define SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC MQTT_PRIMARY_TOPIC "sensor_method5_batch_moving_average_float"
 
 // #define ALT_ID
-#ifdef ALT_ID
-#define MQTT_CLIENT_NAME "Soil1MQTTClientALT"
-#define LWT_TOPIC "Soil1ALT/LWT"
-#else
+// #ifdef ALT_ID
+// #define MQTT_CLIENT_NAME "Soil1MQTTClientALT"
+// #define LWT_TOPIC "Soil1ALT/LWT"
+// #else
 // #define MQTT_TOPIC_PREFIX "soil1/"
 #define MQTT_CLIENT_NAME "Soil1MQTTClient"
-#define LWT_TOPIC "soil_moisture_sensor_1/LWT"
-#endif
+#define LWT_TOPIC MQTT_PRIMARY_TOPIC "LWT"
+// #endif
 
 // #define DEBUG_WSERIAL
 #define MQTT_TELE_PERIOD_SECONDS 300
