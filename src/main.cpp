@@ -37,6 +37,7 @@ WiFiClient myWiFiClient;
 // void callback(char *topic, byte *payload, unsigned int length);
 PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
 unsigned int readAndTxSensorIfDue();
+uint16_t readAnalogueSensorN(unsigned int numReadings, unsigned int msBetweenReadings);
 void readAndPublishSingleRaw(const char* topic);
 unsigned int readMethodsPublish(unsigned int& numReadings, unsigned int msBetweenReadings);
 void method_averageRaw(const char* topic, unsigned int readings[], unsigned int numReadings);
@@ -127,7 +128,8 @@ float prevFilteredValue = 0.0;
 unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000;
 unsigned int runningSensorReading = analogRead(SENSOR_PIN);  // running total reading - taken every RUNNING_SAMPLE_INTERVAL_MS
 float scaleAndTransmit(unsigned int moistureReading, float drySensorMaxRaw, float wetSensorMinRaw, const char* topic);
-float movingAverageValueFloat(unsigned int sensorValue);
+float processMovingAverageValue(unsigned int sensorValue);
+static unsigned int movingAverageReadingsCount = 0;
 
 /**
  * @brief Reads the soil moisture sensor and transmits the data over MQTT if the telemetry period has passed.
@@ -172,14 +174,17 @@ unsigned int readAndTxSensorIfDue() {
         delay(100);
 
         // read sensor
-        uint16_t rawValue = analogRead(SENSOR_PIN);
-        Serial.print(now);
+        // uint16_t rawValue = analogRead(SENSOR_PIN);
+        uint16_t rawValue = readAnalogueSensorN(20,10); // read the sensor twenty times with a short delay between each reading and return the average        Serial.print(now);
         Serial.print(": ");
         Serial.print("Raw sensor value: ");
         Serial.println(rawValue);
         // publishValueToTopic("soil1/moisture_raw", rawValue);
         publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
-        movingAverageValueFloat(rawValue);
+        const float movingAverageValue = processMovingAverageValue(rawValue);
+        publishValueToTopic(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValue);
+        publishValueToTopic(SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC, movingAverageReadingsCount);
+        publishValueToTopic(SENSOR_MOVING_AVERAGE_TOPIC, movingAverageValue);
         sensor_raw = rawValue;
 
         // turn off sensor power
@@ -233,182 +238,70 @@ uint16_t readRaw() {
     return analogRead(SENSOR_PIN);
 }
 
+/**
+ * @brief Reads the analog sensor multiple times and returns the average.
+ * 
+ * This implementation discards the first reading to allow the ADC to stabilize
+ * and then takes a series of samples with a short delay between each.
+ * 
+ * @param numReadings The number of samples to take and average.
+ * @return uint16_t The averaged sensor value.
+ */
+uint16_t readAnalogueSensorN(unsigned int numReadings, unsigned int msBetweenReadings) {
+    if (numReadings == 0) return 0;
+    analogRead(SENSOR_PIN); // Stabilize ADC
+    uint32_t sum = 0;
+    for (unsigned int i = 0; i < numReadings; i++) {
+        delay(msBetweenReadings);
+        sum += analogRead(SENSOR_PIN);
+    }
+    return static_cast<uint16_t>(sum / numReadings);
+}
+
 // Publish a value to the given topic
 void publishValueToTopic(const char* topic, uint16_t value) {
     MQTTpublishValue(topic, static_cast<unsigned int>(value));
 }
 
-// /**
-//  * Reads a specified number of analog readings from a sensor pin and publishes
-//  * the results using different methods. The first reading is discarded and the
-//  * readings are spaced apart by a specified time interval. The methods used are:
-//  * 1. Average of raw readings.
-//  * 2. Finds the most common value in the readings.
-//  * 3. Removes outliers from the readings by replacing them with the average value
-//  *    and then averages the remaining values.
-//  *
-//  * @param numReadings The number of readings to take. Limited to a maximum of 256.
-//  * @param msBetweenReadings The time interval between each reading in milliseconds.
-//  *
-//  * @return The average value of the readings after outliers are removed.
-//  *
-//  * @throws None
-//  */
-// unsigned int readMethodsPublish(unsigned int& numReadings, unsigned int msBetweenReadings) {
-//     // limit readings to max of MAX_READINGS samples
-//     unsigned int readings[MAX_READINGS];
-//     // MQTTclient.publish("soil1/status", "reading sensor batch");
-//     readSensorBatch(numReadings, msBetweenReadings, readings);
-//     // MQTTclient.publish("soil1/status", "reading sensor batch complete");
 
-//     // method 0 - just read raw
-//     uint16_t rawValue = readRaw();
-//     Serial.print("Raw sensor value: ");
-//     Serial.println(rawValue);
-//     // publishValueToTopic("soil1/moisture_raw", rawValue);
-//     publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
-//     // readAndPublishSingleRaw("soil1/sensor_method0_single_raw");
-
-//     // method 1
-//     // method_averageRaw("soil1/moisture_method1_average", readings, numReadings);
-//     method_averageRaw(SENSOR_METHOD1_BATCH_AVERAGE_TOPIC, readings, numReadings);
-
-//     // method 2 - find most common value
-//     unsigned int modeValue = getModeValue(readings, numReadings);
-//     MQTTpublishValue(SENSOR_METHOD2_BATCH_MODE_TOPIC, modeValue);
-
-//     // method 3 - remove outliers, then average
-//     unsigned int averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
-//     for (unsigned int i = 0; i < numReadings; i++) {
-//         if (abs((int)readings[i] - (int)averageValue) > OUTLIER_LIMIT) {  // outlier
-//             // MQTTpublishValue(SENSOR_METHOD3_BATCH_OUTLIER_TOPIC, readings[i]);
-//             // replace with average
-//             readings[i] = averageValue;
-//         }
-//     }
-//     averageValue = getAverageOfReadings(readings, numReadings, true);  // round the average value
-//     MQTTpublishValue(SENSOR_METHOD3_BATCH_AVERAGE_TOPIC, averageValue);
-
-// // method 4 - a moving average of the last 10 readings
-// #define MOVING_AVERAGE_READINGS_WINDOW 10
-
-//     static unsigned int movingAverageReadings[MOVING_AVERAGE_READINGS_WINDOW];
-//     static unsigned int movingAverageCount = 0;
-//     if (movingAverageCount < MOVING_AVERAGE_READINGS_WINDOW) {
-//         movingAverageReadings[movingAverageCount++] = averageValue;
-//     } else {
-//         // shift the readings to the left
-//         for (unsigned int i = 0; i < MOVING_AVERAGE_READINGS_WINDOW - 1; i++) {
-//             movingAverageReadings[i] = movingAverageReadings[i + 1];
-//         }
-//         movingAverageReadings[MOVING_AVERAGE_READINGS_WINDOW - 1] = averageValue;
-//     }
-//     unsigned int movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageCount, true);
-//     // MQTTpublishValue("soil1/moisture_method4_moving_average", movingAverageValue);
-//     MQTTpublishValue(SENSOR_METHOD4_BATCH_MOVING_AVERAGE_TOPIC, movingAverageValue);
-
-// // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
-// #define MOVING_AVERAGE_FLOAT_READINGS_WINDOW 10
-
-//     static float movingAverageReadingsFloat[MOVING_AVERAGE_FLOAT_READINGS_WINDOW];
-//     static unsigned int movingAverageCountFloat = 0;
-//     if (movingAverageCountFloat < MOVING_AVERAGE_FLOAT_READINGS_WINDOW) {
-//         movingAverageReadingsFloat[movingAverageCountFloat++] = static_cast<float>(averageValue);
-//     } else {
-//         // shift the readings to the left
-//         for (unsigned int i = 0; i < MOVING_AVERAGE_FLOAT_READINGS_WINDOW - 1; i++) {
-//             movingAverageReadingsFloat[i] = movingAverageReadingsFloat[i + 1];
-//         }
-//         movingAverageReadingsFloat[MOVING_AVERAGE_FLOAT_READINGS_WINDOW - 1] = static_cast<float>(averageValue);
-//     }
-//     // float movingAverageValueFloat = getAverageOfReadings(movingAverageReadingsFloat, movingAverageCountFloat);
-//     float movingAverageValueFloat = getAverageOfReadings(movingAverageReadingsFloat, movingAverageCountFloat);
-//     // Limit to 1 decimal place
-//     movingAverageValueFloat = roundf(movingAverageValueFloat * 10.0f) / 10.0f;
-//     // MQTTpublishValue("soil1/moisture_method5_moving_average_float", movingAverageValueFloat);
-//     MQTTpublishValue(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValueFloat);
-//     // MQTTclient.publish(, movingAverageValueFloat);
-
-//     return averageValue;
-// }
 
 /**
  * @brief Calculates and publishes a moving average of sensor readings using floating-point values for higher accuracy.
  *
  * This function maintains a static array of floating-point readings and calculates a moving average.
- * The window size for the moving average is defined by `MOVING_AVERAGE_FLOAT_READINGS_WINDOW`.
+ * The window size for the moving average is defined by `MOVING_AVERAGE_WINDOW_SIZE`.
  * The calculated moving average is then rounded to one decimal place and published to the MQTT topic
  * defined by `SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC`.
  *
  * @param numReadings Not directly used in this function, but kept for signature consistency.
  * @param msBetweenReadings Not directly used in this function, but kept for signature consistency.
  */
-float movingAverageValueFloat(unsigned int sensorValue) {
+float processMovingAverageValue(unsigned int sensorValue) {
     // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
-    // #define MOVING_AVERAGE_FLOAT_READINGS_WINDOW 10
+    // #define MOVING_AVERAGE_WINDOW_SIZE 10
 
-    static float movingAverageReadingsFloat[MOVING_AVERAGE_FLOAT_READINGS_WINDOW];
-    static unsigned int movingAverageCountFloat = 0;
+    static float movingAverageReadings[MOVING_AVERAGE_WINDOW_SIZE];
+    // static unsigned int movingAverageReadingsCount = 0;
 
-    if (movingAverageCountFloat < MOVING_AVERAGE_FLOAT_READINGS_WINDOW) {
-        movingAverageReadingsFloat[movingAverageCountFloat++] = static_cast<float>(sensorValue);
+    if (movingAverageReadingsCount < MOVING_AVERAGE_WINDOW_SIZE) {
+        movingAverageReadings[movingAverageReadingsCount++] = static_cast<float>(sensorValue);
     } else {
         // shift the readings to the left
-        for (unsigned int i = 0; i < MOVING_AVERAGE_FLOAT_READINGS_WINDOW - 1; i++) {
-            movingAverageReadingsFloat[i] = movingAverageReadingsFloat[i + 1];
+        for (unsigned int i = 0; i < MOVING_AVERAGE_WINDOW_SIZE - 1; i++) {
+            movingAverageReadings[i] = movingAverageReadings[i + 1];
         }
-        movingAverageReadingsFloat[MOVING_AVERAGE_FLOAT_READINGS_WINDOW - 1] = static_cast<float>(sensorValue);
+        movingAverageReadings[MOVING_AVERAGE_WINDOW_SIZE - 1] = static_cast<float>(sensorValue);
     }
-    // float movingAverageValueFloat = getAverageOfReadings(movingAverageReadingsFloat, movingAverageCountFloat);
-    float movingAverageValueFloat = getAverageOfReadings(movingAverageReadingsFloat, movingAverageCountFloat);
+    // float movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageReadingsCount);
+    float movingAverageValue = getAverageOfReadings(movingAverageReadings, movingAverageReadingsCount);
     // Limit to 1 decimal place
-    movingAverageValueFloat = roundf(movingAverageValueFloat * 10.0f) / 10.0f;
-    // MQTTpublishValue("soil1/moisture_method5_moving_average_float", movingAverageValueFloat);
-    MQTTpublishValue(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValueFloat);
-    // MQTTclient.publish(, movingAverageValueFloat);
-    return movingAverageValueFloat;
+    movingAverageValue = roundf(movingAverageValue * 10.0f) / 10.0f;
+    // MQTTpublishValue("soil1/moisture_method5_moving_average_float", movingAverageValue);
+    // MQTTpublishValue(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValue);
+    // MQTTclient.publish(, movingAverageValue);
+    return movingAverageValue;
 }
 
-// /**
-//  * Calculates the average value of an array of unsigned integers.
-//  *
-//  * By default, integer division is used, so the result is truncated toward zero (not rounded).
-//  * This may lead to loss of precision for small sample sizes or when the sum is not divisible by numReadings.
-//  * If higher accuracy is needed, set the 'round' parameter to true to return the nearest integer (rounded).
-//  *
-//  * @param readings An array of unsigned integers representing sensor readings.
-//  * @param numReadings The number of readings in the array.
-//  * @param round If true, the result will be rounded to the nearest integer. Default is false (truncate).
-//  * @return The average value of the sensor readings, or 0 if numReadings is 0.
-//  */
-// unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int numReadings, bool round = false) {
-//     if (numReadings == 0) {
-//         return 0;
-//     }
-
-//     uint64_t valuesTotal = 0;
-//     for (unsigned int i = 0; i < numReadings; i++) {
-//         valuesTotal += readings[i];
-//     }
-//     if (round) {
-//         return (valuesTotal + numReadings / 2) / numReadings;
-//     } else {
-//         return valuesTotal / numReadings;
-//     }
-// }
-
-// // Returns the average as a floating point value for higher accuracy (unsigned int version)
-// float getAverageOfReadings(const unsigned int readings[], unsigned int numReadings) {
-//     if (numReadings == 0) {
-//         return 0.0f;
-//     }
-
-//     uint64_t valuesTotal = 0;
-//     for (unsigned int i = 0; i < numReadings; i++) {
-//         valuesTotal += readings[i];
-//     }
-//     return static_cast<float>(valuesTotal) / static_cast<float>(numReadings);
-// }
 
 // Returns the average as a floating point value for higher accuracy (float version)
 /**
@@ -429,85 +322,3 @@ float getAverageOfReadings(const float readings[], unsigned int numReadings) {
     }
     return valuesTotal / static_cast<float>(numReadings);
 }
-
-// /**
-//  * Calculates the average value of an array of unsigned integers.
-//  *
-//  * @param readings An array of unsigned integers representing sensor readings.
-//  * @param numReadings The number of readings in the array.
-//  *
-//  * @return The average value of the sensor readings.
-//  *
-//  * @throws None.
-//  */
-// void method_averageRaw(const char* topic, unsigned int readings[], unsigned int numReadings) {
-//     // method 1
-//     unsigned int aveSensorValue = 0;
-//     aveSensorValue = getAverageOfReadings(readings, numReadings);
-//     MQTTpublishValue(topic, aveSensorValue);
-// }
-
-// /**
-//  * Finds the value that occurs most frequently in the given array.
-//  *
-//  * @param a The array of unsigned integers.
-//  * @param n The size of the array.
-//  *
-//  * @return The value that occurs most frequently in the array.
-//  *
-//  * @throws None.
-//  */
-// unsigned int getModeValue(unsigned int a[], unsigned int n) {
-//     unsigned int maxValue = 0;
-//     unsigned int maxCount = 0;
-//     unsigned int i;
-//     unsigned int j;
-
-//     for (i = 0; i < n; ++i) {
-//         unsigned int count = 0;
-
-//         for (j = 0; j < n; ++j) {
-//             if (a[j] == a[i])
-//                 ++count;
-//         }
-
-//         if (count > maxCount) {
-//             maxCount = count;
-//             maxValue = a[i];
-//         }
-//     }
-
-//     return maxValue;
-// }
-
-// unsigned int limitSensorValue(unsigned int reading, unsigned int min, unsigned int max) {
-//     if (reading > max) {
-//         return max;
-//     }
-//     if (reading < min) {
-//         return min;
-//     }
-//     return reading;
-// }
-
-// float scaleAndTransmit(unsigned int moistureReading, float drySensorMaxRaw, float wetSensorMinRaw, const char* topic) {
-//     // for a 0-100 output range
-//     // get range raw / 100 ggives steps per %
-//     // raw range = 3960 - 1530
-//     // steps per % = raw range/100
-//     // for 0 to top of range -> for 0 to raw_range - > inverted_reading_0_to_range = reading - wet_min_raw , where 0 is wet, and dry_max_raw is dry
-//     // to flip ,flipped =  abs( (dry_max_raw - wet_min_raw) - inverted_reading_0_to_range ), gives o-dry to raw_range-wet
-//     //  to scale to 0-100, scaled = (raw_range/100) * flipped
-//     char normalisedSensorValueStr[17];  // max 16 chars string
-//     float RAW_RANGE = (drySensorMaxRaw - wetSensorMinRaw);
-//     unsigned int limitedSensorValue = limitSensorValue(moistureReading, wetSensorMinRaw, drySensorMaxRaw);
-//     // unsigned int limitedSensorValue = moistureReading;
-//     float normalisedSensorValue = (float)abs(RAW_RANGE - ((float)limitedSensorValue - wetSensorMinRaw)) / (RAW_RANGE / 100.0f);
-//     // convert float to 1dp string
-//     sprintf(normalisedSensorValueStr, "%.1f", normalisedSensorValue);  // make the number into string using sprintf function
-//     // Serial.print("Sampling Sensor.....(RAW_RANGE/100.0f)..");      // Serial.println((RAW_RANGE / 100.0f));
-//     Serial.print("scaleAndTransmit..");
-//     Serial.println(normalisedSensorValueStr);
-//     MQTTclient.publish(topic, normalisedSensorValueStr);
-//     return normalisedSensorValue;
-// }
