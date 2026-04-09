@@ -18,6 +18,7 @@ extern PubSubClient MQTTclient;
  * @throws None
  */
 void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int *readings) {
+    // todo convert to dynamic name
     MQTTclient.publish("soil1/status", "reading sensor batch");
     // readSensorBatch(numReadings, msBetweenReadings, readings);
 
@@ -38,6 +39,6 @@ void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, 
     // The function does not return a value, but the readings are stored in the provided array.
     // If you want to return the readings array, you can change the function signature to return `unsigned int*` and return `readings`.
     // return readings;  // This line is not needed since readings is passed by reference
-
+    // todo convert to dynamic name
     MQTTclient.publish("soil1/status", "reading sensor batch complete");
 }

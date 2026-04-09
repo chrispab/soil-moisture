@@ -106,6 +106,7 @@ void setup() {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 
+    // todo change to dynamic name subscription
     MQTTclient.subscribe("soil1/read");
 }
 
@@ -249,6 +250,8 @@ uint16_t readRaw() {
  */
 uint16_t readAnalogueSensorN(unsigned int numReadings, unsigned int msBetweenReadings) {
     if (numReadings == 0) return 0;
+    // analogSetCycles(255);//: set the number of cycles per sample. Default is 8. Range: 1 to 255.
+    // analogSetSamples(3); //: set the number of samples in the range. Default is 1 sample. It has an effect of increasing sensitivity.
     analogRead(SENSOR_PIN); // Stabilize ADC
     uint32_t sum = 0;
     for (unsigned int i = 0; i < numReadings; i++) {
