@@ -2,4 +2,5 @@ https://randomnerdtutorials.com/esp32-adc-analog-read-arduino-ide/
 
 https://community.platformio.org/t/platformio-esp32-adc-use-a-div-2-clock-while-arduino-ide-use-div-1-so-adc-becomes-too-slow/37645/12
 
-
+users may connect a 0.1uF capacitor to the ADC input pad in use
+https://deepbluembedded.com/esp32-adc-tutorial-read-analog-voltage-arduino/

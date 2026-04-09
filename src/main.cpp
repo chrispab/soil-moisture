@@ -126,8 +126,8 @@ void loop() {
 
 unsigned int lastMQTTTransmitMs = millis() - MQTT_TELE_PERIOD_MS - 1000;
 float prevFilteredValue = 0.0;
-unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000;
-unsigned int runningSensorReading = analogRead(SENSOR_PIN);  // running total reading - taken every RUNNING_SAMPLE_INTERVAL_MS
+// unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000;
+// unsigned int runningSensorReading = analogRead(SENSOR_PIN);  // running total reading - taken every RUNNING_SAMPLE_INTERVAL_MS
 float scaleAndTransmit(unsigned int moistureReading, float drySensorMaxRaw, float wetSensorMinRaw, const char* topic);
 float processMovingAverageValue(unsigned int sensorValue);
 static unsigned int movingAverageReadingsCount = 0;
@@ -167,6 +167,7 @@ unsigned int readAndTxSensorIfDue() {
 
         // publish telemetry
         MQTTclient.publish(MQTT_VERSION_TOPIC, VERSION);
+        MQTTclient.publish(MQTT_ZONE_LOCATION_TOPIC, MOISTURE_SENSOR_ZONE_LOCATION);
         MQTTclient.publish(MQTT_TELE_PERIOD_MS_TOPIC, String(MQTT_TELE_PERIOD_MS).c_str());
 
         // turn on sensor POWER

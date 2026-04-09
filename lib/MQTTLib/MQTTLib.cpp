@@ -84,7 +84,7 @@ boolean reconnectMQTT() {
         if (MQTTclient.connect(MQTT_CLIENT_NAME, LWT_TOPIC, 1, true, "Offline")) {
 
             // Once connected, publish an announcement...
-            MQTTclient.publish("outTopic", "hello world");
+            // MQTTclient.publish("outTopic", "hello world");
             MQTTclient.publish(LWT_TOPIC, "Online", true);  // ensure send online
             // ... and resubscribe
             // MQTTclient.subscribe(subscribeTopic);
