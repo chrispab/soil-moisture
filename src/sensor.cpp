@@ -1,4 +1,4 @@
-#include "sensor.h"
+// #include "sensor.h"
 
 #include <Arduino.h>
 
@@ -17,28 +17,28 @@ extern PubSubClient MQTTclient;
  *
  * @throws None
  */
-void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int *readings) {
-    // todo convert to dynamic name
-    MQTTclient.publish("soil1/status", "reading sensor batch");
-    // readSensorBatch(numReadings, msBetweenReadings, readings);
+// void readSensorBatch(unsigned int &numReadings, unsigned int msBetweenReadings, unsigned int *readings) {
+//     // todo convert to dynamic name
+//     MQTTclient.publish("soil1/status", "reading sensor batch");
+//     // readSensorBatch(numReadings, msBetweenReadings, readings);
 
-    if (numReadings > MAX_READINGS) numReadings = MAX_READINGS;
-    if (numReadings == 0) numReadings = 1;
+//     if (numReadings > MAX_READINGS) numReadings = MAX_READINGS;
+//     if (numReadings == 0) numReadings = 1;
 
-    // Discard the first reading to stabilize the ADC (common practice for more reliable sensor data)
-    // delay(msBetweenReadings);
-    analogRead(SENSOR_PIN);
+//     // Discard the first reading to stabilize the ADC (common practice for more reliable sensor data)
+//     // delay(msBetweenReadings);
+//     analogRead(SENSOR_PIN);
 
-    // read in the samples
-    for (unsigned int i = 0; i < numReadings; i++) {
-        delay(msBetweenReadings);
-        readings[i] = analogRead(SENSOR_PIN);
-    }
-    // return readings;  // return the readings array
-    // Note: The readings array is passed by reference, so the values are updated in the caller's context.
-    // The function does not return a value, but the readings are stored in the provided array.
-    // If you want to return the readings array, you can change the function signature to return `unsigned int*` and return `readings`.
-    // return readings;  // This line is not needed since readings is passed by reference
-    // todo convert to dynamic name
-    MQTTclient.publish("soil1/status", "reading sensor batch complete");
-}
+//     // read in the samples
+//     for (unsigned int i = 0; i < numReadings; i++) {
+//         delay(msBetweenReadings);
+//         readings[i] = analogRead(SENSOR_PIN);
+//     }
+//     // return readings;  // return the readings array
+//     // Note: The readings array is passed by reference, so the values are updated in the caller's context.
+//     // The function does not return a value, but the readings are stored in the provided array.
+//     // If you want to return the readings array, you can change the function signature to return `unsigned int*` and return `readings`.
+//     // return readings;  // This line is not needed since readings is passed by reference
+//     // todo convert to dynamic name
+//     MQTTclient.publish("soil1/status", "reading sensor batch complete");
+// }
