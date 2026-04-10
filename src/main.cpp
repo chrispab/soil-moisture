@@ -177,14 +177,16 @@ unsigned int readAndTxSensorIfDue() {
 
         // read sensor
         // uint16_t rawValue = analogRead(SENSOR_PIN);
-        uint16_t rawValue = readAnalogueSensorN(20,10); // read the sensor twenty times with a short delay between each reading and return the average        Serial.print(now);
+        uint16_t rawValue = readAnalogueSensorN(30,10); // read the sensor twenty times with a short delay between each reading and return the average        Serial.print(now);
         Serial.print(": ");
         Serial.print("Raw sensor value: ");
         Serial.println(rawValue);
         // publishValueToTopic("soil1/moisture_raw", rawValue);
-        publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
+        // publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
+        // publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
+        publishValueToTopic(MQTT_RAW_READING_TOPIC, rawValue);
         const float movingAverageValue = processMovingAverageValue(rawValue);
-        publishValueToTopic(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValue);
+        // publishValueToTopic(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValue);
         publishValueToTopic(SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC, movingAverageReadingsCount);
         publishValueToTopic(SENSOR_MOVING_AVERAGE_TOPIC, movingAverageValue);
         sensor_raw = rawValue;
@@ -241,13 +243,15 @@ uint16_t readRaw() {
 }
 
 /**
- * @brief Reads the analog sensor multiple times and returns the average.
- * 
- * This implementation discards the first reading to allow the ADC to stabilize
- * and then takes a series of samples with a short delay between each.
- * 
- * @param numReadings The number of samples to take and average.
- * @return uint16_t The averaged sensor value.
+ * @brief Read the analog sensor multiple times and return the averaged result.
+ *
+ * Performs an initial dummy read to stabilize the ADC, then samples the configured
+ * number of times with the specified inter-read delay. Uses a 32-bit accumulator
+ * to avoid overflow when summing multiple 12-bit ADC readings.
+ *
+ * @param numReadings Number of analog samples to take. If zero, the function returns 0.
+ * @param msBetweenReadings Milliseconds to wait between successive `analogRead()` calls.
+ * @return uint16_t The averaged analog reading (rounded down).
  */
 uint16_t readAnalogueSensorN(unsigned int numReadings, unsigned int msBetweenReadings) {
     if (numReadings == 0) return 0;

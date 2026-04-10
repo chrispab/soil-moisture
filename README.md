@@ -55,3 +55,7 @@ This project is built using PlatformIO.
 
 1. Configure your network settings in `src/config.h`.
 2. Upload via USB or OTA using the `esp32doit-devkit-v1` environment.
+
+## Developer Documentation
+
+More detailed developer-focused documentation (pinout, function reference, and development notes) is available in the `docs` folder: [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md).
