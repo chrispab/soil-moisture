@@ -1,2 +1,2 @@
-#define VERSION "V1.30"
+#define VERSION "V1.33 percentage calculation and publish added"
 

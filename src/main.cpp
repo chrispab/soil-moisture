@@ -36,7 +36,7 @@ WiFiClient myWiFiClient;
 // forward func declarations
 // void callback(char *topic, byte *payload, unsigned int length);
 PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
-unsigned int readAndTxSensorIfDue();
+unsigned int readAndPublishIfDue();
 uint16_t readAnalogueSensorN(unsigned int numReadings, unsigned int msBetweenReadings);
 void readAndPublishSingleRaw(const char* topic);
 unsigned int readMethodsPublish(unsigned int& numReadings, unsigned int msBetweenReadings);
@@ -46,6 +46,7 @@ unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int nu
 // float getAverageOfReadings(const unsigned int readings[], unsigned int numReadings);
 float getAverageOfReadings(const float readings[], unsigned int numReadings);
 void publishValueToTopic(const char* topic, uint16_t value);
+float calculateAndPublishPercentage(unsigned int sensorValue, float drySensorMaxRaw, float wetSensorMinRaw);
 
 void setup() {
     Serial.begin(115200);
@@ -121,7 +122,7 @@ void loop() {
     heartBeatLED.update();
     blueBeatLED.update();
 
-    readAndTxSensorIfDue();
+    readAndPublishIfDue();
 }
 
 unsigned int lastMQTTTransmitMs = millis() - MQTT_TELE_PERIOD_MS - 1000;
@@ -148,11 +149,11 @@ static unsigned int movingAverageReadingsCount = 0;
  *
  * @return unsigned int The last raw sensor reading, or 0 if no reading was performed in the current call.
  */
-unsigned int readAndTxSensorIfDue() {
+unsigned int readAndPublishIfDue() {
     unsigned int now = millis();
-    unsigned int sensor_raw;
+    unsigned int finalValue;
 
-    sensor_raw = 0;
+    finalValue = 0;
 
     if (now - lastMQTTTransmitMs > MQTT_TELE_PERIOD_MS) {
         lastMQTTTransmitMs = now;
@@ -189,13 +190,15 @@ unsigned int readAndTxSensorIfDue() {
         // publishValueToTopic(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValue);
         publishValueToTopic(SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC, movingAverageReadingsCount);
         publishValueToTopic(SENSOR_MOVING_AVERAGE_TOPIC, movingAverageValue);
-        sensor_raw = rawValue;
+        calculateAndPublishPercentage(rawValue, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW);
 
         // turn off sensor power
         digitalWrite(SENSOR_POWERSUPPLY_PIN, LOW);
         pinMode(SENSOR_POWERSUPPLY_PIN, INPUT);
+
+        finalValue = rawValue;
     }
-    return sensor_raw;
+    return finalValue;
 }
 
 /**
@@ -329,4 +332,39 @@ float getAverageOfReadings(const float readings[], unsigned int numReadings) {
         valuesTotal += readings[i];
     }
     return valuesTotal / static_cast<float>(numReadings);
+}
+
+// function limitSensorValue(reading, minLimit, maxLimit) {
+//   if (reading > maxLimit) {
+//     return maxLimit;
+//   }
+//   if (reading < minLimit) {
+//     return minLimit;
+//   }
+//   return reading;
+// }
+float limitSensorValue(float reading, float minLimit, float maxLimit) {
+    if (reading > maxLimit) {
+        return maxLimit;
+    }
+    if (reading < minLimit) {
+        return minLimit;
+    }
+    return reading;
+}
+
+
+// Calculates zone soil moisture sensor percentage when new sensor readings are received, and sends MQTT updates
+float calculateAndPublishPercentage(unsigned int sensorValue, float drySensorMaxRaw, float wetSensorMinRaw) {
+    // Use the limited value
+    float limitedReading = limitSensorValue(sensorValue, wetSensorMinRaw, drySensorMaxRaw);
+    // Improved calculation, handles edge cases
+    float RAW_RANGE = drySensorMaxRaw - wetSensorMinRaw;
+    float temp = ((RAW_RANGE - (limitedReading - wetSensorMinRaw)) / RAW_RANGE) * 100.0f;
+    float moisturePercentage = fmaxf(0.0f, fminf(100.0f, temp));
+    // Round to 1 decimal place
+    moisturePercentage = roundf(moisturePercentage * 10.0f) / 10.0f;
+    // Publish the percentage value
+    MQTTpublishValue(MQTT_MOISTURE_PERCENTAGE_TOPIC, moisturePercentage);
+    return moisturePercentage;
 }
