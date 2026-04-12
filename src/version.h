@@ -1,2 +1,2 @@
-#define VERSION "V1.66"
+#define VERSION "V1.70 improve build upload process"
 
