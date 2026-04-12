@@ -55,7 +55,9 @@
 
 // #define DRY_SENSOR_MAX_RAW 900.0
 // #define DRY_SENSOR_MAX_RAW 2450.0
-#define DRY_SENSOR_MAX_RAW 2000.0
+// #define DRY_SENSOR_MAX_RAW 2000.0
+#define DRY_SENSOR_MAX_RAW 1950
+
 // 
 #define WET_SENSOR_MIN_RAW 0.0
 
