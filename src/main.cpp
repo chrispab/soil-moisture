@@ -37,7 +37,7 @@ WiFiClient myWiFiClient;
 // void callback(char *topic, byte *payload, unsigned int length);
 PubSubClient MQTTclient(mqttBroker, 1883, callback, myWiFiClient);
 unsigned int readAndPublishIfDue();
-uint16_t readAnalogueSensorN(unsigned int numReadings, unsigned int msBetweenReadings);
+uint16_t readAnalogueSensorNM(unsigned int numReadings, unsigned int msBetweenReadings);
 void readAndPublishSingleRaw(const char* topic);
 unsigned int readMethodsPublish(unsigned int& numReadings, unsigned int msBetweenReadings);
 void method_averageRaw(const char* topic, unsigned int readings[], unsigned int numReadings);
@@ -125,7 +125,7 @@ void loop() {
     readAndPublishIfDue();
 }
 
-unsigned int lastMQTTTransmitMs = millis() - MQTT_TELE_PERIOD_MS - 1000;
+uint32_t lastMQTTTransmitMs = millis() - MQTT_TELE_PERIOD_MS - 1000;
 float prevFilteredValue = 0.0;
 // unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000;
 // unsigned int runningSensorReading = analogRead(SENSOR_PIN);  // running total reading - taken every RUNNING_SAMPLE_INTERVAL_MS
@@ -162,29 +162,34 @@ unsigned int readAndPublishIfDue() {
         // commandString += number1;
         // commandString += "\",145,\"Number1\"";
         // sendATCommand(commandString.c_str(), 1000);
-        
+
         // String topic = MQTT_TOPIC_PREFIX + MOISTURE_SENSOR_ID;
         // MQTTclient.publish(topic.c_str(),1/version";
 
         // publish telemetry
         MQTTclient.publish(MQTT_VERSION_TOPIC, VERSION);
         MQTTclient.publish(MQTT_ZONE_LOCATION_TOPIC, MOISTURE_SENSOR_ZONE_LOCATION);
+        MQTTclient.publish(SENSOR_ID_TOPIC, MOISTURE_SENSOR_ID);
+        MQTTclient.publish(SENSOR_WARMUP_TIME_TOPIC, String(SENSOR_WARMUP_TIME_MS).c_str());
+
         MQTTclient.publish(MQTT_TELE_PERIOD_MS_TOPIC, String(MQTT_TELE_PERIOD_MS).c_str());
 
         // turn on sensor POWER
         pinMode(SENSOR_POWERSUPPLY_PIN, OUTPUT);
         digitalWrite(SENSOR_POWERSUPPLY_PIN, HIGH);
-        delay(100);
+        delay((u_int32_t)SENSOR_WARMUP_TIME_MS);  // wait for the sensor to power up and stabilize
+        // delay((u_int32_t)15000);  // wait for the sensor to power up and stabilize
 
         // read sensor
         // uint16_t rawValue = analogRead(SENSOR_PIN);
-        uint16_t rawValue = readAnalogueSensorN(30,10); // read the sensor twenty times with a short delay between each reading and return the average        Serial.print(now);
+        uint16_t rawValue = readAnalogueSensorNM(30, 10);  // read the sensor n times with a short delay m between each reading and return the average        Serial.print(now);
         Serial.print(": ");
         Serial.print("Raw sensor value: ");
         Serial.println(rawValue);
         // publishValueToTopic("soil1/moisture_raw", rawValue);
         // publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
         // publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
+
         publishValueToTopic(MQTT_RAW_READING_TOPIC, rawValue);
         const float movingAverageValue = processMovingAverageValue(rawValue);
         // publishValueToTopic(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValue);
@@ -212,12 +217,21 @@ unsigned int readAndPublishIfDue() {
 void MQTTpublishValue(const char* topic, unsigned int value) {
     char valueStr[20];  // max of 20 chars string
     utoa(value, valueStr, 10);
+    if (!MQTTclient.connected()) {
+        Serial.println("MQTTpublishValue int not connected, trying to reconnect...");
+        reconnectMQTT();
+    }
     MQTTclient.publish(topic, valueStr);
 }
 
 void MQTTpublishValue(const char* topic, float value) {
     char valueStr[20];
     dtostrf(value, 0, 1, valueStr);  // 1 decimal place
+    if (!MQTTclient.connected()) {
+        Serial.println("MQTTpublishValue float not connected, trying to reconnect...");
+
+        reconnectMQTT();
+    }
     MQTTclient.publish(topic, valueStr);
 }
 
@@ -256,11 +270,11 @@ uint16_t readRaw() {
  * @param msBetweenReadings Milliseconds to wait between successive `analogRead()` calls.
  * @return uint16_t The averaged analog reading (rounded down).
  */
-uint16_t readAnalogueSensorN(unsigned int numReadings, unsigned int msBetweenReadings) {
+uint16_t readAnalogueSensorNM(unsigned int numReadings, unsigned int msBetweenReadings) {
     if (numReadings == 0) return 0;
     // analogSetCycles(255);//: set the number of cycles per sample. Default is 8. Range: 1 to 255.
     // analogSetSamples(3); //: set the number of samples in the range. Default is 1 sample. It has an effect of increasing sensitivity.
-    analogRead(SENSOR_PIN); // Stabilize ADC
+    analogRead(SENSOR_PIN);  // Stabilize ADC
     uint32_t sum = 0;
     for (unsigned int i = 0; i < numReadings; i++) {
         delay(msBetweenReadings);
@@ -273,8 +287,6 @@ uint16_t readAnalogueSensorN(unsigned int numReadings, unsigned int msBetweenRea
 void publishValueToTopic(const char* topic, uint16_t value) {
     MQTTpublishValue(topic, static_cast<unsigned int>(value));
 }
-
-
 
 /**
  * @brief Calculates and publishes a moving average of sensor readings using floating-point values for higher accuracy.
@@ -312,7 +324,6 @@ float processMovingAverageValue(unsigned int sensorValue) {
     // MQTTclient.publish(, movingAverageValue);
     return movingAverageValue;
 }
-
 
 // Returns the average as a floating point value for higher accuracy (float version)
 /**
@@ -352,7 +363,6 @@ float limitSensorValue(float reading, float minLimit, float maxLimit) {
     }
     return reading;
 }
-
 
 // Calculates zone soil moisture sensor percentage when new sensor readings are received, and sends MQTT updates
 float calculateAndPublishPercentage(unsigned int sensorValue, float drySensorMaxRaw, float wetSensorMinRaw) {

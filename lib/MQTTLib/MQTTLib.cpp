@@ -1,4 +1,4 @@
-//#include "WebSocketLib.h"
+// #include "WebSocketLib.h"
 #include <PubSubClient.h>
 
 #include "config.h"
@@ -19,10 +19,10 @@ int MQTTSocketNumber = 1;  // 1-16
 // char publishHumiTopic[] = "433Bridge/Humidity";
 
 /**
- * 
  *
- * 
-*/
+ *
+ *
+ */
 void connectMQTT() {
     bool MQTTConnectTimeout = false;
     unsigned long checkPeriodMillis = 20000;
@@ -32,7 +32,7 @@ void connectMQTT() {
     static unsigned long lastReconnectAttemptMillis =
         nowMillis - checkPeriodMillis - 1000;
 
-    //is it time to chek the MQTT connection again?
+    // is it time to chek the MQTT connection again?
     if ((nowMillis - lastReconnectAttemptMillis) > checkPeriodMillis) {
         // myWebSerial.println("ready to try MQTT reconnectMQTT...");
         Serial.print("nowMillis : ");
@@ -67,42 +67,36 @@ void connectMQTT() {
     }
 }
 
+unsigned long lastReconnectAttempt = 0;
 
-long lastReconnectAttempt = 0;
-
-boolean reconnectMQTT() {
-
+bool reconnectMQTT() {
     // Serial.println("MQTT is not connected.. trying to connect now");
 
-    long now = millis();
-    if (now - lastReconnectAttempt > 5000) {
+    unsigned long now = millis();
+    if ((now - lastReconnectAttempt) > 5000) {
         lastReconnectAttempt = now;
 
-        Serial.println("MQTT is not connected.. trying to connect now");
+        Serial.println("..trying to connect MQTT..");
 
         // Attempt to reconnect
         if (MQTTclient.connect(MQTT_CLIENT_NAME, LWT_TOPIC, 1, true, "Offline")) {
-
             // Once connected, publish an announcement...
             // MQTTclient.publish("outTopic", "hello world");
             MQTTclient.publish(LWT_TOPIC, "Online", true);  // ensure send online
             // ... and resubscribe
             // MQTTclient.subscribe(subscribeTopic);
-    
-            Serial.println("MQTT is now connected....");
 
-            lastReconnectAttempt = 0;
+            Serial.println("..MQTT is now connected");
         }
     }
+    // Return true if the MQTT client is connected, false otherwise.
     return MQTTclient.connected();
 }
 
-
-
-extern char *getTimeStr();
+extern char* getTimeStr();
 
 // MQTTclient call back if mqtt messsage rxed (cos has been subscribed  to)
-void MQTTRxcallback(char *topic, byte *payload, unsigned int length) {
+void MQTTRxcallback(char* topic, byte* payload, unsigned int length) {
     uint8_t socketNumber = 0;
 
     // Power<x> 		Show current power state of relay<x> as On or
@@ -121,7 +115,7 @@ void MQTTRxcallback(char *topic, byte *payload, unsigned int length) {
     strcat(fullMQTTmessage, "]:");
     // append payload and add \o terminator
     strcat(fullMQTTmessage, "[");
-    strncat(fullMQTTmessage, (char *)payload, length);
+    strncat(fullMQTTmessage, (char*)payload, length);
     strcat(fullMQTTmessage, "]");
 
     // Serial.println(fullMQTTmessage);
@@ -200,7 +194,7 @@ void MQTTRxcallback(char *topic, byte *payload, unsigned int length) {
 }
 
 // void MQTTLibSetup(void) {}
-//#include "WebSerial.h"
+// #include "WebSerial.h"
 // extern WebSerial myWebSerial;
 // #include "My433Transmitter.h"
 // extern My433Transmitter transmitter;

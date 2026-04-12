@@ -17,9 +17,9 @@ See `src/config.h` for configurable constants (WiFi, MQTT topics, timing, and pi
 
 **Important functions (quick reference)**
 
-- `readAnalogueSensorN(numReadings, msBetweenReadings)` — in [src/main.cpp](src/main.cpp)
+- `readAnalogueSensorNM(numReadings, msBetweenReadings)` — in [src/main.cpp](src/main.cpp)
   - Purpose: Read the analog sensor multiple times, average the readings and return a 16-bit value. The sensor power is toggled elsewhere before/after sampling.
-  - Usage: Called as `readAnalogueSensorN(20, 10)` to sample 20 times with 10ms between reads.
+  - Usage: Called as `readAnalogueSensorNM(20, 10)` to sample 20 times with 10ms between reads.
   - Notes: Includes an initial `analogRead()` to stabilize the ADC and uses a 32-bit accumulator to avoid overflow.
 
 - `readAndTxSensorIfDue()` — in [src/main.cpp](src/main.cpp)
@@ -36,7 +36,7 @@ See `src/config.h` for configurable constants (WiFi, MQTT topics, timing, and pi
 
 **Development notes & recommendations**
 - Keep the sensor powered only while sampling to reduce galvanic corrosion on probes.
-- Use `readAnalogueSensorN()` instead of single `analogRead()` to reduce noise and obtain more stable values.
+- Use `readAnalogueSensorNM()` instead of single `analogRead()` to reduce noise and obtain more stable values.
 - If you need higher ADC sensitivity/tuning on ESP32, consider using `analogSetCycles()`/`analogSetSamples()` (comments exist in `src/main.cpp`).
 
 **Building & Uploading**
