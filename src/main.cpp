@@ -171,21 +171,26 @@ unsigned int readAndPublishIfDue() {
                 MQTTclient.publish(SENSOR_ID_TOPIC, MOISTURE_SENSOR_ID);
                 MQTTclient.publish(SENSOR_WARMUP_TIME_TOPIC, String(SENSOR_WARMUP_TIME_MS).c_str());
                 MQTTclient.publish(MQTT_TELE_PERIOD_MS_TOPIC, String(MQTT_TELE_PERIOD_MS).c_str());
+                MQTTclient.publish(WET_SENSOR_MIN_RAW_TOPIC, String(WET_SENSOR_MIN_RAW).c_str());
+                MQTTclient.publish(DRY_SENSOR_MAX_RAW_TOPIC, String(DRY_SENSOR_MAX_RAW).c_str());
+                MQTTclient.publish(SENSOR_MODE_TOPIC, "STATE_IDLE");
 
                 // Turn on sensor POWER and start warmup phase
                 pinMode(SENSOR_POWERSUPPLY_PIN, OUTPUT);
                 digitalWrite(SENSOR_POWERSUPPLY_PIN, HIGH);
-                
+
                 sensorPowerOnMs = now;
                 currentSensorState = STATE_WARMUP;
+                MQTTclient.publish(SENSOR_MODE_TOPIC, "STATE_WARMUP");
             }
             break;
 
         case STATE_WARMUP:
+
             if (now - sensorPowerOnMs >= (uint32_t)SENSOR_WARMUP_TIME_MS) {
                 // Warmup complete, perform the reading
-                uint16_t rawValue = readAnalogueSensorNM(30, 13);
-                
+                uint16_t rawValue = readAnalogueSensorNM(MOVIG_AVERAGE_SAMPLES, MOVING_AVERAGE_DELAY_BETWEEN_READINGS_MS);  // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
+
                 Serial.print(now);
                 Serial.print(": Raw sensor value: ");
                 Serial.println(rawValue);
@@ -202,6 +207,7 @@ unsigned int readAndPublishIfDue() {
 
                 finalValue = rawValue;
                 currentSensorState = STATE_IDLE;
+                MQTTclient.publish(SENSOR_MODE_TOPIC, "STATE_IDLE");
             }
             break;
     }
