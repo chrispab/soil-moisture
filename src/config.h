@@ -5,8 +5,12 @@
 
 //sensor instance specific stuff
 // #include "config_zone1.h"
-#include "config_zone3.h"
-
+// #include "config_zone3.h"
+#if defined(USE_ZONE1_CONFIG)
+    #include "config_zone1.h"
+#elif defined(USE_ZONE3_CONFIG)
+    #include "config_zone3.h"
+#endif
 
 // common config items
 #define MQTT_TOPIC_PREFIX "soil_moisture_sensor_"
@@ -22,7 +26,7 @@
 //eg zone1/soil_moisture_sensor/3/rawReading
 #define MQTT_PRIMARY_TOPIC_2 "Zone" ZONE_ID "/SoilMoistureSensor/" MOISTURE_SENSOR_ID
 #define MQTT_RAW_READING_TOPIC MQTT_PRIMARY_TOPIC_2  "/ReadingRaw"
-
+#define MQTT_COMMAND_SUBSCRIBE_TOPIC MQTT_PRIMARY_TOPIC  "/Read"
 #define SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC MQTT_PRIMARY_TOPIC "/ReadingMovingAverageWindowSize"
 
 // #define SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC MQTT_PRIMARY_TOPIC  "/sensor_method5_batch_moving_average_float"
@@ -51,7 +55,7 @@
 
 // #define DRY_SENSOR_MAX_RAW 900.0
 // #define DRY_SENSOR_MAX_RAW 2450.0
-#define DRY_SENSOR_MAX_RAW 1500.0
+#define DRY_SENSOR_MAX_RAW 2000.0
 // 
 #define WET_SENSOR_MIN_RAW 0.0
 

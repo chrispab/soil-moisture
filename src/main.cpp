@@ -53,7 +53,9 @@ void setup() {
     while (!Serial)  // Wait for the serial connection to be establised.
         delay(50);
 
-    Serial.println("Hi from soil1 ... Booting");
+    Serial.print("Hi from ");
+    Serial.print(HOST_NAME);
+    Serial.println(" ... Booting");
     connectWiFi();
     printWifiStatus();
     Serial.print("IP address: ");
@@ -107,8 +109,7 @@ void setup() {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 
-    // todo change to dynamic name subscription
-    MQTTclient.subscribe("soil1/read");
+    MQTTclient.subscribe(MQTT_COMMAND_SUBSCRIBE_TOPIC);
 }
 
 void loop() {
