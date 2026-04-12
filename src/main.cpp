@@ -128,6 +128,13 @@ void loop() {
 uint32_t lastMQTTTransmitMs = millis() - MQTT_TELE_PERIOD_MS - 1000;
 float prevFilteredValue = 0.0;
 // unsigned int lastMoistureSampleMs = millis() - RUNNING_SAMPLE_INTERVAL_MS - 1000;
+
+enum SensorState {
+    STATE_IDLE,
+    STATE_WARMUP
+};
+static SensorState currentSensorState = STATE_IDLE;
+static uint32_t sensorPowerOnMs = 0;
 // unsigned int runningSensorReading = analogRead(SENSOR_PIN);  // running total reading - taken every RUNNING_SAMPLE_INTERVAL_MS
 float scaleAndTransmit(unsigned int moistureReading, float drySensorMaxRaw, float wetSensorMinRaw, const char* topic);
 float processMovingAverageValue(unsigned int sensorValue);
@@ -150,58 +157,53 @@ static unsigned int movingAverageReadingsCount = 0;
  * @return unsigned int The last raw sensor reading, or 0 if no reading was performed in the current call.
  */
 unsigned int readAndPublishIfDue() {
-    unsigned int now = millis();
-    unsigned int finalValue;
+    uint32_t now = millis();
+    unsigned int finalValue = 0;
 
-    finalValue = 0;
+    switch (currentSensorState) {
+        case STATE_IDLE:
+            if (now - lastMQTTTransmitMs > MQTT_TELE_PERIOD_MS) {
+                lastMQTTTransmitMs = now;
 
-    if (now - lastMQTTTransmitMs > MQTT_TELE_PERIOD_MS) {
-        lastMQTTTransmitMs = now;
+                // Publish telemetry preliminary to reading
+                MQTTclient.publish(MQTT_VERSION_TOPIC, VERSION);
+                MQTTclient.publish(MQTT_ZONE_LOCATION_TOPIC, MOISTURE_SENSOR_ZONE_LOCATION);
+                MQTTclient.publish(SENSOR_ID_TOPIC, MOISTURE_SENSOR_ID);
+                MQTTclient.publish(SENSOR_WARMUP_TIME_TOPIC, String(SENSOR_WARMUP_TIME_MS).c_str());
+                MQTTclient.publish(MQTT_TELE_PERIOD_MS_TOPIC, String(MQTT_TELE_PERIOD_MS).c_str());
 
-        // commandString = "AT+CPBW=1,\"";
-        // commandString += number1;
-        // commandString += "\",145,\"Number1\"";
-        // sendATCommand(commandString.c_str(), 1000);
+                // Turn on sensor POWER and start warmup phase
+                pinMode(SENSOR_POWERSUPPLY_PIN, OUTPUT);
+                digitalWrite(SENSOR_POWERSUPPLY_PIN, HIGH);
+                
+                sensorPowerOnMs = now;
+                currentSensorState = STATE_WARMUP;
+            }
+            break;
 
-        // String topic = MQTT_TOPIC_PREFIX + MOISTURE_SENSOR_ID;
-        // MQTTclient.publish(topic.c_str(),1/version";
+        case STATE_WARMUP:
+            if (now - sensorPowerOnMs >= (uint32_t)SENSOR_WARMUP_TIME_MS) {
+                // Warmup complete, perform the reading
+                uint16_t rawValue = readAnalogueSensorNM(30, 13);
+                
+                Serial.print(now);
+                Serial.print(": Raw sensor value: ");
+                Serial.println(rawValue);
 
-        // publish telemetry
-        MQTTclient.publish(MQTT_VERSION_TOPIC, VERSION);
-        MQTTclient.publish(MQTT_ZONE_LOCATION_TOPIC, MOISTURE_SENSOR_ZONE_LOCATION);
-        MQTTclient.publish(SENSOR_ID_TOPIC, MOISTURE_SENSOR_ID);
-        MQTTclient.publish(SENSOR_WARMUP_TIME_TOPIC, String(SENSOR_WARMUP_TIME_MS).c_str());
+                publishValueToTopic(MQTT_RAW_READING_TOPIC, rawValue);
+                const float movingAverageValue = processMovingAverageValue(rawValue);
+                publishValueToTopic(SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC, movingAverageReadingsCount);
+                publishValueToTopic(SENSOR_MOVING_AVERAGE_TOPIC, movingAverageValue);
+                calculateAndPublishPercentage(rawValue, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW);
 
-        MQTTclient.publish(MQTT_TELE_PERIOD_MS_TOPIC, String(MQTT_TELE_PERIOD_MS).c_str());
+                // Turn off sensor power
+                digitalWrite(SENSOR_POWERSUPPLY_PIN, LOW);
+                pinMode(SENSOR_POWERSUPPLY_PIN, INPUT);
 
-        // turn on sensor POWER
-        pinMode(SENSOR_POWERSUPPLY_PIN, OUTPUT);
-        digitalWrite(SENSOR_POWERSUPPLY_PIN, HIGH);
-        delay((u_int32_t)SENSOR_WARMUP_TIME_MS);  // wait for the sensor to power up and stabilize
-        // delay((u_int32_t)15000);  // wait for the sensor to power up and stabilize
-
-        // read sensor
-        // uint16_t rawValue = analogRead(SENSOR_PIN);
-        uint16_t rawValue = readAnalogueSensorNM(30, 10);  // read the sensor n times with a short delay m between each reading and return the average        Serial.print(now);
-        Serial.print(": ");
-        Serial.print("Raw sensor value: ");
-        Serial.println(rawValue);
-        // publishValueToTopic("soil1/moisture_raw", rawValue);
-        // publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
-        // publishValueToTopic(SENSOR_METHOD0_SINGLE_RAW_TOPIC, rawValue);
-
-        publishValueToTopic(MQTT_RAW_READING_TOPIC, rawValue);
-        const float movingAverageValue = processMovingAverageValue(rawValue);
-        // publishValueToTopic(SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC, movingAverageValue);
-        publishValueToTopic(SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC, movingAverageReadingsCount);
-        publishValueToTopic(SENSOR_MOVING_AVERAGE_TOPIC, movingAverageValue);
-        calculateAndPublishPercentage(rawValue, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW);
-
-        // turn off sensor power
-        digitalWrite(SENSOR_POWERSUPPLY_PIN, LOW);
-        pinMode(SENSOR_POWERSUPPLY_PIN, INPUT);
-
-        finalValue = rawValue;
+                finalValue = rawValue;
+                currentSensorState = STATE_IDLE;
+            }
+            break;
     }
     return finalValue;
 }

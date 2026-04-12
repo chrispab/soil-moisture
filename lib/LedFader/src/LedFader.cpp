@@ -74,11 +74,8 @@ void LedFader::begin ()
   {
   //pinMode (pin_, OUTPUT);
   //digitalWrite (pin_, LOW);
-      ledcAttachPin(pin_, pwmChannel_); // assign  led pins to channels
-          // Initialize channels
-    // channels 0-15, resolution 1-16 bits, freq limits depend on resolution
-    // ledcSetup(uint8_t channel, uint32_t freq, uint8_t resolution_bits);
-    ledcSetup(pwmChannel_, 12000, 8); // 12 kHz PWM, 8-bit resolution
+    ledcSetup(pwmChannel_, 12000, 8); // Initialize channel parameters (freq/res) first
+    ledcAttachPin(pin_, pwmChannel_); // Then attach the pin to the initialized channel
     ledcWrite(pwmChannel_, 255);      // test high output of all leds in sequence
     delay(1000);
     ledcWrite(pwmChannel_, 0);
@@ -181,4 +178,3 @@ void LedFader::update ()
    {
    return active_;
    }  // end of LedFader::isOn
-
