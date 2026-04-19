@@ -1,2 +1,2 @@
-#define VERSION "V1.71 moisture sensor improvements"
+#define VERSION "V1.72 moisture sensor limits"
 

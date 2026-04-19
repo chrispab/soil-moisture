@@ -59,7 +59,7 @@
 #define DRY_SENSOR_MAX_RAW 2000
 
 // 
-#define WET_SENSOR_MIN_RAW 0.0
+#define WET_SENSOR_MIN_RAW 1060.0
 
 
 #endif  // __CONFIG_H
