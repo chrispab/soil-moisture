@@ -55,7 +55,9 @@
 #define SENSOR_POWERSUPPLY_PIN GPIO_NUM_23
 
 // lower raw values are wetter, higher raw values are drier
-#define WET_SENSOR_MIN_RAW 1060.0
-#define DRY_SENSOR_MAX_RAW 2000.0
+// #define WET_SENSOR_MIN_RAW 1060.0
+#define WET_SENSOR_MIN_RAW 1500.0
+// #define DRY_SENSOR_MAX_RAW 2000.0
+#define DRY_SENSOR_MAX_RAW 2100.0
 
 #endif  // __CONFIG_H

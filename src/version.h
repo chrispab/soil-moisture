@@ -1,2 +1,2 @@
-#define VERSION "V1.75 refactoring choose percentage value source and limit raw value for percentage calculation"
+#define VERSION "V1.76 wet dry raw limits"
 

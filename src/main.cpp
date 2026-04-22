@@ -197,15 +197,11 @@ unsigned int readAndPublishIfDue() {
                 // Warmup complete, perform the reading
                 uint16_t readValue = readAnalogueSensorNM(MOVIG_AVERAGE_SAMPLES, MOVING_AVERAGE_DELAY_BETWEEN_READINGS_MS);  // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
 
-
-
-
                 // Turn off sensor power
                 digitalWrite(SENSOR_POWERSUPPLY_PIN, LOW);
                 pinMode(SENSOR_POWERSUPPLY_PIN, INPUT);
 
 
-                
                 Serial.print(now);
                 Serial.print(": Raw sensor value: ");
                 Serial.println(readValue);
@@ -232,7 +228,6 @@ unsigned int readAndPublishIfDue() {
                 float moisturePercentage = calculateMoisturePercentage(readValue, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW);
                 // Publish the percentage value
                 MQTTpublishValue(MQTT_MOISTURE_PERCENTAGE_TOPIC, moisturePercentage);
-
 
 
                 returnValue = readValue;
