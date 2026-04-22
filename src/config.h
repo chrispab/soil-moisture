@@ -28,7 +28,8 @@
 #define MQTT_RAW_READING_TOPIC MQTT_PRIMARY_TOPIC_2  "/ReadingRaw"
 #define MQTT_COMMAND_SUBSCRIBE_TOPIC MQTT_PRIMARY_TOPIC  "/Read"
 #define SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC MQTT_PRIMARY_TOPIC "/ReadingMovingAverageWindowSize"
-
+#define PERCENTAGE_FROM_VALUE_SOURCE_TOPIC MQTT_PRIMARY_TOPIC "/PercentageFromValueSource"
+#define PERCENTAGE_FROM_VALUE_SOURCE "raw"  // or "moving_average" or "limited_raw" etc, determines which value is used for percentage calculation
 // #define SENSOR_METHOD5_BATCH_MOVING_AVERAGE_FLOAT_TOPIC MQTT_PRIMARY_TOPIC  "/sensor_method5_batch_moving_average_float"
 #define SENSOR_MOVING_AVERAGE_TOPIC MQTT_PRIMARY_TOPIC  "/ReadingMovingAverage"
 #define WET_SENSOR_MIN_RAW_TOPIC MQTT_PRIMARY_TOPIC  "/WetSensorMinRaw"
@@ -53,13 +54,8 @@
 #define SENSOR_PIN GPIO_NUM_36
 #define SENSOR_POWERSUPPLY_PIN GPIO_NUM_23
 
-// #define DRY_SENSOR_MAX_RAW 900.0
-// #define DRY_SENSOR_MAX_RAW 2450.0
-// #define DRY_SENSOR_MAX_RAW 2000.0
-#define DRY_SENSOR_MAX_RAW 2000
-
-// 
+// lower raw values are wetter, higher raw values are drier
 #define WET_SENSOR_MIN_RAW 1060.0
-
+#define DRY_SENSOR_MAX_RAW 2000.0
 
 #endif  // __CONFIG_H

@@ -46,7 +46,10 @@ unsigned int getAverageOfReadings(const unsigned int readings[], unsigned int nu
 // float getAverageOfReadings(const unsigned int readings[], unsigned int numReadings);
 float getAverageOfReadings(const float readings[], unsigned int numReadings);
 void publishValueToTopic(const char* topic, uint16_t value);
-float calculateAndPublishPercentage(unsigned int sensorValue, float drySensorMaxRaw, float wetSensorMinRaw);
+float calculateMoisturePercentage(unsigned int sensorValue, float drySensorMaxRaw, float wetSensorMinRaw);
+void MQTTpublishValue(const char* topic, unsigned int value);
+void MQTTpublishValue(const char* topic, float value);
+float limitSensorValue(float reading, float minLimit, float maxLimit);
 
 void setup() {
     Serial.begin(115200);
@@ -159,7 +162,7 @@ static unsigned int movingAverageReadingsCount = 0;
  */
 unsigned int readAndPublishIfDue() {
     uint32_t now = millis();
-    unsigned int finalValue = 0;
+    unsigned int returnValue = 0;
 
     switch (currentSensorState) {
         case STATE_IDLE:
@@ -174,6 +177,8 @@ unsigned int readAndPublishIfDue() {
                 MQTTclient.publish(MQTT_TELE_PERIOD_MS_TOPIC, String(MQTT_TELE_PERIOD_MS).c_str());
                 MQTTclient.publish(WET_SENSOR_MIN_RAW_TOPIC, String(WET_SENSOR_MIN_RAW).c_str());
                 MQTTclient.publish(DRY_SENSOR_MAX_RAW_TOPIC, String(DRY_SENSOR_MAX_RAW).c_str());
+                MQTTclient.publish(PERCENTAGE_FROM_VALUE_SOURCE_TOPIC, PERCENTAGE_FROM_VALUE_SOURCE);
+                // MQTTclient.publish(PERCENTAGE_FROM_VALUE_String(PERCENTAGE_FROM_VALUE).c_str());
                 MQTTclient.publish(SENSOR_MODE_TOPIC, "STATE_IDLE");
 
                 // Turn on sensor POWER and start warmup phase
@@ -190,29 +195,53 @@ unsigned int readAndPublishIfDue() {
 
             if (now - sensorPowerOnMs >= (uint32_t)SENSOR_WARMUP_TIME_MS) {
                 // Warmup complete, perform the reading
-                uint16_t rawValue = readAnalogueSensorNM(MOVIG_AVERAGE_SAMPLES, MOVING_AVERAGE_DELAY_BETWEEN_READINGS_MS);  // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
+                uint16_t readValue = readAnalogueSensorNM(MOVIG_AVERAGE_SAMPLES, MOVING_AVERAGE_DELAY_BETWEEN_READINGS_MS);  // method 5 - a moving average of the last 20 readings, but with floating point values for higher accuracy
 
-                Serial.print(now);
-                Serial.print(": Raw sensor value: ");
-                Serial.println(rawValue);
 
-                publishValueToTopic(MQTT_RAW_READING_TOPIC, rawValue);
-                const float movingAverageValue = processMovingAverageValue(rawValue);
-                publishValueToTopic(SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC, movingAverageReadingsCount);
-                publishValueToTopic(SENSOR_MOVING_AVERAGE_TOPIC, movingAverageValue);
-                calculateAndPublishPercentage(rawValue, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW);
+
 
                 // Turn off sensor power
                 digitalWrite(SENSOR_POWERSUPPLY_PIN, LOW);
                 pinMode(SENSOR_POWERSUPPLY_PIN, INPUT);
 
-                finalValue = rawValue;
+
+                
+                Serial.print(now);
+                Serial.print(": Raw sensor value: ");
+                Serial.println(readValue);
+
+                publishValueToTopic(MQTT_RAW_READING_TOPIC, readValue);
+                const float movingAverageValue = processMovingAverageValue(readValue);
+                publishValueToTopic(SENSOR_MOVING_AVERAGE_WINDOW_SIZE_TOPIC, movingAverageReadingsCount);
+                publishValueToTopic(SENSOR_MOVING_AVERAGE_TOPIC, movingAverageValue);
+
+                if (strcmp(PERCENTAGE_FROM_VALUE_SOURCE, "raw") == 0) {
+                    // Use raw value for percentage calculation
+                } else if (strcmp(PERCENTAGE_FROM_VALUE_SOURCE, "moving_average") == 0) {
+                    // Use moving average value for percentage calculation
+                    readValue = static_cast<unsigned int>(movingAverageValue);
+                } else if (strcmp(PERCENTAGE_FROM_VALUE_SOURCE, "limited_raw") == 0) {
+                    // Use limited raw value for percentage calculation
+                    readValue = static_cast<unsigned int>(limitSensorValue(static_cast<float>(readValue), WET_SENSOR_MIN_RAW, DRY_SENSOR_MAX_RAW));
+                } else {
+                    // Invalid configuration, default to raw value
+                    Serial.println("Invalid PERCENTAGE_FROM_VALUE_SOURCE configuration, defaulting to raw value for percentage calculation.");
+                }
+
+                // Calculate moisture percentage
+                float moisturePercentage = calculateMoisturePercentage(readValue, DRY_SENSOR_MAX_RAW, WET_SENSOR_MIN_RAW);
+                // Publish the percentage value
+                MQTTpublishValue(MQTT_MOISTURE_PERCENTAGE_TOPIC, moisturePercentage);
+
+
+
+                returnValue = readValue;
                 currentSensorState = STATE_IDLE;
                 MQTTclient.publish(SENSOR_MODE_TOPIC, "STATE_IDLE");
             }
             break;
     }
-    return finalValue;
+    return returnValue;
 }
 
 /**
@@ -374,16 +403,31 @@ float limitSensorValue(float reading, float minLimit, float maxLimit) {
 }
 
 // Calculates zone soil moisture sensor percentage when new sensor readings are received, and sends MQTT updates
-float calculateAndPublishPercentage(unsigned int sensorValue, float drySensorMaxRaw, float wetSensorMinRaw) {
+float calculateMoisturePercentage(unsigned int sensorValue, float drySensorMaxRaw, float wetSensorMinRaw) {
+    
+    
+    // if (strcmp(PERCENTAGE_FROM_VALUE_SOURCE, "raw") == 0) {
+    //     // Use raw value for percentage calculation
+    // } else if (strcmp(PERCENTAGE_FROM_VALUE_SOURCE, "moving_average") == 0) {
+    //     // Use moving average value for percentage calculation
+    //     sensorValue = static_cast<unsigned int>(processMovingAverageValue(sensorValue));
+    // } else if (strcmp(PERCENTAGE_FROM_VALUE_SOURCE, "limited_raw") == 0) {
+    //     // Use limited raw value for percentage calculation
+    //     sensorValue = static_cast<unsigned int>(limitSensorValue(static_cast<float>(sensorValue), wetSensorMinRaw, drySensorMaxRaw));
+    // } else {
+    //     // Invalid configuration, default to raw value
+    //     Serial.println("Invalid PERCENTAGE_FROM_VALUE_SOURCE configuration, defaulting to raw value");
+    // }
     // Use the limited value
     float limitedReading = limitSensorValue(sensorValue, wetSensorMinRaw, drySensorMaxRaw);
+    // or use the raw value, but this can lead to percentages slightly below 0% or above 100% when the sensor reading is outside the calibrated min/max range
+
     // Improved calculation, handles edge cases
     float RAW_RANGE = drySensorMaxRaw - wetSensorMinRaw;
     float temp = ((RAW_RANGE - (limitedReading - wetSensorMinRaw)) / RAW_RANGE) * 100.0f;
     float moisturePercentage = fmaxf(0.0f, fminf(100.0f, temp));
     // Round to 1 decimal place
     moisturePercentage = roundf(moisturePercentage * 10.0f) / 10.0f;
-    // Publish the percentage value
-    MQTTpublishValue(MQTT_MOISTURE_PERCENTAGE_TOPIC, moisturePercentage);
+
     return moisturePercentage;
 }
