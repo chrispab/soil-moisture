@@ -1,2 +1,2 @@
-#define VERSION "V1.76 wet dry raw limits"
+#define VERSION "V1.77 dry max 1960.0"
 
